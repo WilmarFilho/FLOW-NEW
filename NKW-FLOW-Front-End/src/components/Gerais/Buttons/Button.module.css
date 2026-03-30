@@ -1,0 +1,64 @@
+.button {
+  height: 100px;
+  width: 250px;
+  padding: 0 32px;
+  border-radius: var(--radius-default);
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: var(--font-main);
+  transition: transform 0.4s ease, background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, outline-offset 0.3s ease;
+  outline: none;
+}
+.primary {
+  background-color: var(--color-secundaria);
+  color: white;
+}
+.button:hover {
+  background-color: var(--color-text-white);
+  color: var(--color-text-black);
+}
+.secondary {
+  background-color: transparent;
+  color: var(--color-secundaria);
+  border-color: var(--color-secundaria);
+}
+.primary:hover:not(:disabled) {
+  transform: scale(0.90);
+}
+.secondary:hover:not(:disabled) {
+  background-color: var(--color-secundaria);
+  color: #ffffff;
+  transform: scale(0.95);
+}
+.button:focus-visible {
+  outline: 2px solid var(--color-secundaria);
+  outline-offset: 3px;
+}
+.button:disabled {
+  background-color: #333;
+  color: #666;
+  border-color: #333;
+  cursor: not-allowed;
+}
+@media (max-width: 1399.98px) {
+  .button {
+    height: 90px;
+    width: 200px;
+    padding: 0;
+    font-size: 14px;
+  }
+}
+@media (max-width: 991.98px) {
+  .button {
+    height: 78px;
+    line-height: 20px;
+    font-size: 14px;
+    padding: 0 24px;
+  }
+}
+@media (max-width: 599.98px) {
+  .button {
+    height: 54px;
+  }
+}

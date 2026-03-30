@@ -1,0 +1,87 @@
+.loginBox {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5em;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  width: 85%;
+  max-width: 750px;
+  height: 600px;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.loginBox input {
+  width: 70%;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background-color: #374151;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.loginBox input::placeholder {
+  color: #9ca3af;
+}
+
+.loginBox input:focus {
+  outline: 2px solid #3b82f6;
+  background-color: #4b5563;
+}
+
+.loginBox button {
+  width: 70%;
+  padding: 1.25rem 0.75rem;
+  background-color: #1b214a90;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.wrapperLogo {
+  width: 70%;
+  display: flex;
+  justify-content: start;
+  margin-bottom: 40px;
+}
+
+.error {
+  text-align: start;
+  color: #ff55559c;
+  width: 70%;
+}
+
+
+
+
+@media (max-width: 999.98px) {
+  .loginBox {
+    height: 500px;
+    padding: 1em;
+  }
+
+  .loginBox button,
+  .loginBox input,
+  .wrapperLogo {
+    width: 80%;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .loginBox {
+    padding: 1em;
+  }
+
+  .loginBox button,
+  .loginBox input,
+  .wrapperLogo {
+    width: 90%;
+  }
+}

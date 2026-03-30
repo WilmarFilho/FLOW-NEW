@@ -1,0 +1,167 @@
+.containerRewards {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+}
+.boxReward {
+    height: 100%;
+    position: relative;
+    border-radius: var(--radius-default);
+    gap: 12px;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 22px;
+}
+.boxRewardLocked h4,
+.boxRewardUnlock h4 {
+    font-size: 34px;
+    font-family: var(--font-main);
+    text-transform: uppercase;
+}
+.boxRewardUnlock {
+    background-color: var(--color-primary);
+    color: var(--color-text-white);
+}
+.boxRewardLocked {
+    background-color: var(--color-background-white);
+    color: var(--color-text);
+}
+.rowContainerRewards {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+.rowContainerRewards h2 {
+    font-size: 20px;
+    font-family: var(--font-main);
+    text-transform: uppercase;
+    background-color: var(--color-background-white);
+    padding: 8px 12px;
+    border-radius: 10px;
+}
+.rowContainerRewards svg {
+    width: 40px;
+    height: 45px;
+}
+.bodyContainerRewards {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    justify-content: start;
+    align-items: center;
+    padding-top: 18px;
+    flex: 1;
+}
+.rowBodyContainerRewards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+.rowBodyContainerRewards span {
+    opacity: .4;
+    font-size: 12px;
+}
+.containerLiRewards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: start;
+    justify-content: start;
+    width: 100%;
+    text-align: start;
+}
+.rowLiRewards {
+    display: flex;
+    gap: 6px;
+    font-family: var(--font-main);
+    font-size: 14px;
+    text-transform: uppercase;
+    align-items: center;
+}
+.rowLiRewards svg {
+    width: 24px;
+    color: var(--color-secundaria);
+}
+.footerContainerRewards {
+    font-size: 1p6x;
+    font-family: var(--font-secundaria);
+    background-color: var(--color-background-white);
+    padding: 12px 12px;
+    display: flex;
+    justify-content: center;
+    border-radius: 10px;
+    color: var(--color-text-white);
+    width: 100%;
+}
+@media (max-width: 1550px) {
+    .containerRewards {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .boxReward {
+        min-width: 340px;
+        flex: 0 0 auto;
+    }
+}
+@media (max-width: 1175.98px) {
+
+    .boxRewardLocked h4,
+    .boxRewardUnlock h4 {
+        font-size: 28px;
+    }
+
+    .rowContainerRewards h2 {
+        font-size: 18px;
+    }
+}
+@media (max-width: 991.98px) {
+    .boxReward {
+        min-width: 300px;
+    }
+}
+@media (max-width: 599.98px) {
+    .boxReward {
+        min-width: 260px;
+        padding: 12px;
+    }
+
+    .rowLiRewards {
+        font-size: 12px;
+    }
+
+}
+@media (max-width: 499.98px) {
+    .boxReward {
+        min-width: 200px;
+    }
+
+    .containerRewards {
+        display: none;
+    }
+
+    .footerContainerRewards {
+        display: none;
+    }
+
+    .rowContainerRewards svg {
+        display: none;
+    }
+
+    .boxRewardLocked h4,
+    .boxRewardUnlock h4 {
+        font-size: 22px;
+    }
+
+    .rowContainerRewards h2 {
+        font-size: 14px;
+    }
+
+}

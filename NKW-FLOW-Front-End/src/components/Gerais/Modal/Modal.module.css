@@ -1,0 +1,338 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-overlay-modal);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modalOverlayTransparent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding-bottom: 70px;
+  background-color: var(--color-overlay-modal-chat);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modalContentTransparent {
+  background: var(--color-modal-chat);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  position: relative;
+  width: 90%;
+  max-width: 750px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.4s ease-out;
+}
+
+.modalContent {
+  background: var(--color-modal);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  position: relative;
+  width: 90%;
+  max-width: 850px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.4s ease-out;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 60px 60px 24px 60px;
+  border-bottom: 1px solid var(--color-borders);
+}
+
+.modalHeader h2 {
+  color: var(--color-text);
+  font-size: 24px;
+  font-family: var(--font-main);
+  margin: 0;
+}
+
+.modalBody {
+  padding: 60px 60px;
+  scrollbar-width: none;
+  min-height: 270px;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 24px;
+  padding: 30px 60px;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-borders);
+}
+
+.submitButton {
+  width: 100%;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--color-secundaria);
+  opacity: .6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: .5s;
+  outline: none;
+  font-family: var(--font-main);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.submitButton svg {
+  fill: var(--color-text);
+  width: 28px;
+}
+
+.submitButton:hover {
+  opacity: 1;
+  transition: .5s;
+}
+
+.cancelButton {
+  width: 20%;
+  height: 50px;
+  color: var(--color-text);
+  background-color: transparent;
+  border: 2px solid var(--color-background-white);
+  border-radius: 8px;
+  opacity: .5;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  outline: none;
+  transition: .5;
+  font-family: var(--font-main);
+}
+
+.cancelButton:hover {
+  background-color: var(--color-background-white);
+  transition: .5;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.closeButton {
+  background-color: transparent;
+  border: 1px solid var(--color-background-white);
+  border-radius: 100px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #aaa;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
+  outline: none;
+}
+
+.closeButton:hover {
+  color: var(--color-text);
+  transform: rotate(90deg);
+}
+
+.closeButton:focus-visible {
+  border: 1px solid var(--color-background-white);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid white;
+  border-top: 3px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.agentModal {
+  color: var(--color-text);
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+}
+
+.agentModalDetails {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.agentConnections,
+.agentStats {
+  height: 100%;
+  width: 45%;
+  gap: 26px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-background-chats-options);
+  padding: 32px;
+  border-radius: 12px;
+}
+
+.agentStatsInfo {
+  display: flex;
+  color: var(--color-text);
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+}
+.numberChatsAgents {
+  display: flex;
+  height: 70px;
+  width: 70px;
+  border-radius: 214px;
+  border: 2px solid var(--color-text);
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+}
+
+.agentModal p {
+  opacity: .5;
+  text-wrap: balance;
+}
+
+.agentModal span {
+  opacity: .5;
+}
+
+.agentModal h3 {
+  font-size: 24px;
+  font-family: var(--font-main);
+}
+
+.ulConnections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.liConnection {
+  padding: 14px 24px;
+  background-color: var(--color-background-white);
+  border-radius: 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: var(--font-main);
+  letter-spacing: 1px;
+  opacity: .5;
+}
+
+@media (max-width: 1091.98px) {
+
+  .modalHeader h2 {
+    font-size: 20px;
+  }
+
+  .modalHeader {
+    padding: 24px;
+  }
+
+  .modalFooter {
+    padding: 24px;
+    gap: 8px;
+  }
+
+  .cancelButton {
+    font-size: 14px;
+    width: 30%;
+  }
+
+  .submitButton {
+    font-size: 16px;
+  }
+
+}
+
+@media (max-width: 599.98px) {
+
+  .modalHeader h2 {
+    font-size: 18px;
+  }
+
+  .modalHeader {
+    padding: 22px;
+  }
+
+  .modalFooter {
+    padding: 22px;
+    gap: 6px;
+  }
+
+  .cancelButton {
+    display: none;
+  }
+
+  .submitButton {
+    font-size: 14px;
+  }
+
+}
+
+@media (max-width: 591.98px) {
+
+  .modalBody {
+    padding: 40px 30px;
+  }
+
+  .modalHeader h2 {
+    font-size: 16px;
+  }
+
+}

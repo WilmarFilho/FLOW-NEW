@@ -1,0 +1,28 @@
+.container {
+  display: flex;
+  gap: 8px;
+}
+.button {
+  padding: 12px 24px;
+  border-radius: var(--radius-default);
+  background-color: transparent;
+  cursor: pointer;
+  font-weight: 300;
+  border: 3px solid var(--color-borders);
+  outline: none;
+  transition: 0.2s ease;
+  color: var(--color-text);
+  opacity: .7;
+  font-family: var(--font-secundaria);
+}
+.active {
+  color: var(--color-text-white);
+  opacity: 1;
+  border: none;
+  background-color: var(--color-secundaria);
+}
+@media (max-width: 991.98px) {
+  .button {
+    padding: 8px 16px;
+  }
+}

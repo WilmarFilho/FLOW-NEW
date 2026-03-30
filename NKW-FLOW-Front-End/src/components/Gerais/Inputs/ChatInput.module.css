@@ -1,0 +1,119 @@
+.chatInputForm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: var(--radius-default);
+  width: 100%;
+  height: 100%;
+  padding: 0 16px;
+  overflow: hidden;
+  background-color: var(--color-background-white);
+  color: var(--color-text-table);
+}
+.chatInputForm:focus-within {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.inputField {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--color-text);
+  opacity: .5;
+  font-size: 16px;
+  font-family: var(--font-secundaria);
+}
+.inputField::placeholder {
+  color: var(--color-text);
+}
+.sendButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  outline: none;
+  background: none;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--color-text-table);
+  transition: background-color 0.2s, color 0.2s, outline-offset 0.1s;
+}
+.sendButton svg {
+  fill: var(--color-text);
+  opacity: .5;
+}
+.sendButton:hover:not(:disabled) {
+  background-color: var(--color-background-white);
+  color: #ffffff;
+}
+.sendButton:focus-visible {
+  outline: 2px solid var(--color-background-white);
+  outline-offset: 2px;
+  color: var(--color-secundaria);
+}
+.sendButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.recordingContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  border-radius: 12px;
+  width: 100%;
+  padding: 8px 8px 8px 20px;
+  background-color: var(--color-background-white);
+  color: var(--color-text-table);
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.visualizer {
+  flex-grow: 1;
+  height: 40px;
+}
+.visualizerContainer {
+  flex: 1;
+}
+.visualizerContainer span {
+  color: var(--color-text);
+}
+.trashButton svg {
+  stroke: #e63946;
+  /* Vermelho para a lixeira */
+}
+.sendRecordingButton svg {
+  stroke: var(--primary-color);
+  /* Sua cor primária */
+}
+.recordingStatus {
+  color: #e63946;
+  /* Vermelho para indicar gravação */
+  font-weight: 500;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.recordingStatus span {
+  font-variant-numeric: tabular-nums;
+  margin-left: 8px;
+}
+.stopButton svg {
+  stroke: white;
+  /* Ícone branco */
+}
+.visualizerContainer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+@media (max-width: 767.98px) {
+  .sendButton {
+    width: 34px;
+    height: 34px;
+  }
+}

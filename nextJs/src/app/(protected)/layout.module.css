@@ -1,0 +1,14 @@
+.mainContent {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+@media (max-width: 500px) {
+  .mainContent {
+    padding-top: 90px; /* 70px of the header + 20px breathing room */
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

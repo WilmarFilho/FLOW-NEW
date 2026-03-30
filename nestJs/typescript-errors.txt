@@ -1,0 +1,1 @@
+src/logs/logs.controller.ts(9,42): error TS1272: A type referenced in a decorated signature must be imported with 'import type' or a namespace import when 'isolatedModules' and 'emitDecoratorMetadata' are enabled.

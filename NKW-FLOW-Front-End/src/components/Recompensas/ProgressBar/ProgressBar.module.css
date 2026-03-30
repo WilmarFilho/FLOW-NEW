@@ -1,0 +1,56 @@
+.progressBar {
+    position: relative;
+    height: 22px;
+    background: var(--color-background-row-hover);
+    border-radius: 60px;
+    margin: 20px 0;
+}
+
+.progressFillReward {
+    background-color: var(--color-primary);
+    height: 100%;
+    border-radius: 200px;
+}
+
+.progressCheckpoint {
+    position: absolute;
+    top: -10px;
+    width: 48px;
+    height: 48px;
+    cursor: pointer;
+    background: var(--color-text-white);
+    border: 2px solid #9ca3af;
+    border-radius: 50%;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    font-family: var(--font-main);
+    line-height: 20px;
+    transform: translateX(-50%);
+    color: var(--color-text-black);
+    outline: 2px solid var(--color-background-messages);
+    outline-offset: -10px;
+}
+
+.progressCheckpoint.completed {
+    background: var(--color-progress-checkpoint);
+    border: none;
+    cursor: pointer;
+    outline: 2px solid white;
+    outline-offset: -10px;
+    color: var(--color-text-white);
+}
+
+@media (max-width: 991.98px) {
+    .progressBar {
+        display: none;
+    }
+}
+
+@media (max-height: 799.98px) {
+    .progressBar {
+        display: none;
+    }
+}

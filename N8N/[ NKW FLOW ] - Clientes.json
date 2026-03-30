@@ -1,0 +1,1921 @@
+{
+  "name": "[ NKW FLOW ] - Clientes",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution.nkwflow.com/message/sendText/{{ $('Code in JavaScript2').item.json.connectionId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "XJNTxYD3cxrlP01phcVGdBTGdF0Xt5"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Code in JavaScript2').item.json.contatoNumero }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.messagesToSend.text }}"
+            },
+            {
+              "name": "delay",
+              "value": "={{ 5000 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1472,
+        896
+      ],
+      "id": "ccdd5634-0a39-48f5-8b6e-ff6084bd056c",
+      "name": "RequisiçãoEnviaMSG"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1184,
+        880
+      ],
+      "id": "ca57bf9c-57b5-4ded-b7b5-ebbd40690912",
+      "name": "RodaTodasMSG"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "messagesToSend",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "chat_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        992,
+        880
+      ],
+      "id": "88161d8a-9452-4a0e-ae25-868839450440",
+      "name": "SplitaEmItens"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\nconst fullResponse = $input.first().json.output.resposta;\n\nconst sentences = fullResponse.split(/(?<=[.?!])\\s+|\\n\\s*\\n|\\n(?=[A-Z])/)\n                              .filter(s => s.trim() !== '');\n\nif (sentences.length === 0 && fullResponse.trim() !== '') {\n  sentences.push(fullResponse.trim());\n}\n\n// CRUCIAL: Criamos um array de OBJETOS, onde cada um tem uma chave \"text\".\nitem.json.messagesToSend = sentences.map(sentence => ({ text: sentence.trim() }));\n\n// Retorna o item único com o array dentro.\nreturn [item];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        880
+      ],
+      "id": "374b64b6-fd25-4c9c-980c-61e873bbec1a",
+      "name": "DivideMensagem"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={\n  \"tipoAgente\": \"{{ $('Code in JavaScript2').item.json.promptAgente }}\",\n  \"mensagemCitada\": \"{{ $('Code in JavaScript2').item.json.mensagemCitada }}\",\n  \"mensagemTexto\": \"{{ $('Code in JavaScript2').item.json.mensagemTexto }}\",\n  \"textoImagem\": \"{{ $('Code in JavaScript2').item.json.TextoImagem }}\",\n  \"textoAudio\": \"{{ $('Code in JavaScript2').item.json.TextoAudio }}\",\n  \"conhecimento\": \"{{ $json.output }}\"\n}\n",
+        "options": {
+          "systemMessage": "=<assistant_system_prompt>\nVocê é um assistente virtual humano que representa uma empresa parceira do NKW Flow. \nSeu papel é conversar com os clientes dessa empresa de forma natural, empática e objetiva — sempre adaptando o tom ao tipo de agente indicado.\n\n---\n\n### 🧠 Entradas\n1. **tipoAgente:** define seu papel e tom de fala (Atendimento, Vendas, Consultoria ou Suporte).  \n2. **mensagemCitada:** mensagem da conversa que o cliente esta citando (pode ser undefined ou null caso o cliente não esteja citando nenhuma mensagem anterior).  \n3. **mensagemTexto / textoImagem / textoAudio:** conteúdo enviado pelo cliente.  \n4. **conhecimento:** informações fornecidas sobre a empresa (produtos, serviços, políticas, endereço, etc.).\n\n---\n\n### 🎯 Comportamento por tipo de agente\n\n**🟢 Atendimento**  \nFale de forma simpática e acolhedora. Esclareça dúvidas comuns, oriente sobre próximos passos e ofereça ajuda sem parecer um robô.  \nExemplo de tom: “Claro! Posso te ajudar com isso rapidinho 😉”\n\n**🟣 Vendas**  \nSeja leve, persuasivo e empolgado. Destaque benefícios e incentive a ação.  \nExemplo de tom: “Esse produto é ótimo! Quer que eu te envie o link pra finalizar o pedido?”\n\n**🔵 Consultoria**  \nFale com segurança e empatia. Dê dicas práticas e mostre conhecimento estratégico.  \nExemplo de tom: “Uma boa prática seria começar por essa etapa — costuma gerar ótimos resultados.”\n\n**🟠 Suporte**  \nSeja calmo, paciente e tranquilizador. Mostre que está resolvendo ou que vai encaminhar.  \nExemplo de tom: “Poxa, entendo o incômodo! Vamos resolver isso juntos, tudo bem?”\n\n---\n\n🧭 Regras Gerais\n\nAnalise o contexto da mensagem e identifique a intenção (dúvida, solicitação, reclamação, etc.).\n\nResponda de forma breve e natural, sem usar frases introdutórias genéricas.\n\nUse o conhecimento disponível como base para respostas úteis e coerentes.\n\nEvite parecer robótico ou repetitivo. Fale como alguém realmente prestando atendimento.\n\nSe a dúvida estiver fora do escopo ou exigir ação humana, não diga que “não sabe”. Use transições suaves como:\n\n“Posso confirmar isso com a equipe e te retorno certinho.”\n\n“Vou pedir pro pessoal dessa área dar uma olhada.”\n\n“Parece um caso mais específico, posso encaminhar pro time certo?”\n→ Nestes casos, defina isChamaAtendente = true.\n\nNunca invente informações.\n\nPrefira frases curtas e diretas, 1 a 2 parágrafos no máximo.\n\n---\n\n### 🧾 Quando definir `isChamaAtendente = true`\n\nO cliente demonstra urgência, insatisfação ou frustração.\n\nA situação exige ação humana (suporte técnico, cobrança, alteração de dados, etc).\n\nA solicitação se encaixa em qualquer regra de intervenção existente na base de conhecimento do cliente.\n\nA solicitação não pode ser respondida automaticamente pelo conhecimento registrado.\n\nNa prática, isso significa:\n\nAntes de acionar intervenção, a IA deve consultar a base de conhecimento do cliente para verificar se há alguma regra de intervenção explícita que corresponda à situação.\n\nMesmo que a solicitação esteja dentro do conhecimento, se a regra indicar que precisa de atendente (ex.: “pedido de orçamento”), deve chamar.\n\n---\n\n### 📤 Formato de saída obrigatório\n```json\n{\n  \"resposta\": \"Mensagem breve, empática e natural que será enviada ao cliente.\",\n  \"isChamaAtendente\": false\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        944
+      ],
+      "id": "31112a63-53c0-43e3-aa88-36e8cd02d084",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        1168
+      ],
+      "id": "a2b2f53a-5812-4b4f-8a06-82cae72fb2f5",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Code in JavaScript2').item.json.chatId }}",
+        "contextWindowLength": 400
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        112,
+        1152
+      ],
+      "id": "b1fec66d-c9ea-42c9-8788-9cc671502381",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "HKZAYOJcf2nDh0xI",
+          "name": "Cache NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Recebe Eventos das Connections do Cliente",
+        "height": 392,
+        "width": 1104,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        1520
+      ],
+      "id": "8a9f3b5e-67e8-4c9e-b38a-1dd392031f17",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        1584
+      ],
+      "id": "e35cbe48-cd8f-41dd-af12-456b76860602",
+      "name": "Segue"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "925837fc-0f02-4fcf-b040-c7e818bcb858",
+              "leftValue": "={{ $json.event.tipo_mensagem }}",
+              "rightValue": "texto",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        1600
+      ],
+      "id": "35f6f492-b8c9-4fbb-ae30-ab0e01026bbd",
+      "name": "temMidia?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0d11c022-1d4f-4d58-ac79-31139a62af4f",
+              "name": "mensagemTexto",
+              "value": "={{ $('Loop Over Items1').item.json.event.data.message.conversation || null }}",
+              "type": "string"
+            },
+            {
+              "id": "5d233381-5ed8-4004-8557-21af1841e5f0",
+              "name": "Base64",
+              "value": "={{ $json.base64  || null}}",
+              "type": "string"
+            },
+            {
+              "id": "8f3cc7d2-b27b-4a4f-a611-f5ade567f534",
+              "name": "IdAssinante",
+              "value": "={{ $('Loop Over Items1').item.json.event.connection.user.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f4182db9-4d7e-4d05-aeef-2b158d845828",
+              "name": "tipoMensagem",
+              "value": "={{ $('Loop Over Items1').item.json.event.tipo_mensagem }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1376,
+        1696
+      ],
+      "id": "8d4b9eef-e87b-4904-ad3b-3dabac00536d",
+      "name": "DadosUteis"
+    },
+    {
+      "parameters": {
+        "content": "Mensagem de Texto\n\n",
+        "height": 220,
+        "width": 344,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        1360
+      ],
+      "id": "5f89249b-54c5-4a1c-9bde-0f332c3a5386",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        1440
+      ],
+      "id": "9bc6b94b-2024-4352-8418-0b5b362530ed",
+      "name": "Segue1"
+    },
+    {
+      "parameters": {
+        "content": "Mensagem de Imagem",
+        "height": 220,
+        "width": 344,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        1600
+      ],
+      "id": "0012f27f-99d6-4cf5-b763-42a57606ccd4",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "Base64",
+        "binaryPropertyName": "={{ $('Loop Over Items1').item.json.event.data.key.id }}",
+        "options": {
+          "fileName": "={{ $('Loop Over Items1').item.json.event.data.key.id }}.ogg"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1776,
+        1888
+      ],
+      "id": "b2f3f7e2-c89a-46b5-ad45-964ecf35bef5",
+      "name": "ConvertBase64Binario3"
+    },
+    {
+      "parameters": {
+        "content": "Mensagem de Áudio",
+        "height": 220,
+        "width": 344,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        1840
+      ],
+      "id": "6c35439d-9257-4fd5-b638-91db4c7edf84",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0d11c022-1d4f-4d58-ac79-31139a62af4f",
+              "name": "mensagemTexto",
+              "value": "={{ $json.mensagemTexto || $('Loop Over Items1').item.json.event.data.message.imageMessage.caption || null}}",
+              "type": "string"
+            },
+            {
+              "id": "8f3cc7d2-b27b-4a4f-a611-f5ade567f534",
+              "name": "IdAssinante",
+              "value": "={{ $('Loop Over Items1').item.json.event.connection.user.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f2dc03fd-4668-4b47-a0e2-9189715cf597",
+              "name": "tipoMensagem",
+              "value": "={{ $('DadosUteis').item.json.tipoMensagem }}",
+              "type": "string"
+            },
+            {
+              "id": "6d4aa4d9-4622-4212-8db3-5ba91dd4c3b6",
+              "name": "TextoImagem",
+              "value": "={{ $json.response || null }}",
+              "type": "string"
+            },
+            {
+              "id": "fa621413-22f8-40a1-a3da-b1c733432fca",
+              "name": "TextoAudio",
+              "value": "={{ $json.text || null }}",
+              "type": "string"
+            },
+            {
+              "id": "ca7584f4-0e88-4214-90c5-b6cf3507fc10",
+              "name": "promptAgente",
+              "value": "={{ $('Loop Over Items1').item.json.event.connection.agente.tipo_de_agente }}",
+              "type": "string"
+            },
+            {
+              "id": "468f6efe-4224-4d97-a936-e0c839ffc5c7",
+              "name": "numerosAtendentes",
+              "value": "={{ $('Loop Over Items1').item.json.event.numerosAtendentes || null }}",
+              "type": "array"
+            },
+            {
+              "id": "d56de579-2982-46a9-a2d6-1edc305eb9a3",
+              "name": "chatId",
+              "value": "={{ $('Loop Over Items1').item.json.event.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3a92c8ce-2a66-4524-bbfd-fd1c710bd9d7",
+              "name": "contatoNumero",
+              "value": "={{ $('Loop Over Items1').item.json.event.chat.contato_numero }}",
+              "type": "string"
+            },
+            {
+              "id": "014c93c0-fc9a-4ea2-b3d0-4af07d7efb75",
+              "name": "connectionId",
+              "value": "={{ $('Loop Over Items1').item.json.event.chat.connection_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b3622730-6809-464a-ba0c-05625a3671a6",
+              "name": "mensagemCitada",
+              "value": "={{ $('Loop Over Items1').item.json.event.data.contextInfo.quotedMessage.conversation || null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2192,
+        1648
+      ],
+      "id": "5e5d5e01-ba83-4fce-ac43-f1d3593af5b3",
+      "name": "DadosUteis2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Descreva essa imagem com o maximo de detalhes\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/jpeg;base64,{{ $json.Base64 }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"max_tokens\": 500\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        1648
+      ],
+      "id": "aac96d71-2b2c-4c8c-9e16-772d3e0b61a5",
+      "name": "DescreveIMG",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "eY8IFpyESsQCroEz",
+          "name": "Bearer Auth account"
+        },
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "={{ $('Loop Over Items1').item.json.event.data.key.id }}"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        1888
+      ],
+      "id": "eac48251-ee21-40f4-84b5-34c5c93cbcb9",
+      "name": "TranscreveAudio",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "eY8IFpyESsQCroEz",
+          "name": "Bearer Auth account"
+        },
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Mensagem de texto\n\n",
+        "height": 220,
+        "width": 184
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        1520
+      ],
+      "id": "63f0b283-e645-4e98-b95e-b5df89f36a14",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution.nkwflow.com/chat/getBase64FromMediaMessage/{{ $('Loop Over Items1').item.json.event.connection.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "XJNTxYD3cxrlP01phcVGdBTGdF0Xt5"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $('Loop Over Items1').item.json.event.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1168,
+        1872
+      ],
+      "id": "bcefb3fc-6a0b-4664-a0f8-80fa7b44cf93",
+      "name": "RequestPegaBase"
+    },
+    {
+      "parameters": {
+        "content": "Mensagem de midia\n\n\n",
+        "height": 240,
+        "width": 184
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        1792
+      ],
+      "id": "3a40e810-cb98-4f7c-b629-acc43909681b",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "content": "Apaga a conecction do cliente caso ela caia",
+        "height": 376,
+        "width": 688,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        1792
+      ],
+      "id": "e3b8d0a5-8ebd-4443-abbf-6c7769a912fd",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipoMensagem }}",
+                    "rightValue": "texto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cab01a44-40ad-4347-9b3a-e1fecb5bad27"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4498018c-6136-4851-91d8-f15153576533",
+                    "leftValue": "={{ $json.tipoMensagem }}",
+                    "rightValue": "imagem",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e31b89b2-ec12-40f9-aff7-7b0e203fdba8",
+                    "leftValue": "={{ $json.tipoMensagem }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1536,
+        1680
+      ],
+      "id": "5796c04b-219a-44c1-8813-fcb773080a1e",
+      "name": "TipoMensagem1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evolution",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        1728
+      ],
+      "id": "ef2b1d1a-c023-4f28-a321-c040fa5ff64c",
+      "name": "ChegouEvento",
+      "webhookId": "8032ba1f-104f-4fd0-8c47-435e5d1db1cb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1dd8202a-42d3-4749-9c07-a28bbe8b4b62",
+              "leftValue": "={{ $('ChegouEvento').first().json.body.connection.status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        1920
+      ],
+      "id": "2a1979ca-743e-4041-9ef2-09a6c3ab661b",
+      "name": "ConnectionCaiu",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://evolution.nkwflow.com/instance/delete/{{$('ChegouEvento').first().json.body.data.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "XJNTxYD3cxrlP01phcVGdBTGdF0Xt5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        1856
+      ],
+      "id": "4d12d49e-0415-42f3-a105-28f95b6b4990",
+      "name": "RequestDELETE",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -608,
+        1120
+      ],
+      "id": "448a35a1-5ccb-47d0-b7de-f2a922334a26",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Use a tabela a seguir para buscar conhecimento: {{ 'empresa_' + $json.IdAssinante.replace(/-/g, '_') }}\n\nEste banco de RAG pode conter diferentes tipos de informações, incluindo:\n- Binários de **PDFs**, que podem conter documentos, faturas, relatórios técnicos ou contratos.\n- Arquivos **JSON** extraídos de planilhas **XLS**, representando dados estruturados, registros de operações, tabelas de produtos, históricos de clientes ou métricas financeiras.\n- Arquivos **TXT** com dados textuais diversos, anotações, informações de suporte, descrições de processos ou resumos de atendimentos.\n- Arquivos **TXT** no formato “Conversa: ...”, que podem representar diálogos, registros de atendimento, trocas de mensagens internas ou interações informais que também contenham informações úteis sobre o negócio do cliente.\n\nVocê é um **assistente especialista em análise e extração de conhecimento empresarial**.\n\nSua tarefa é:\n1. **Analisar profundamente todos os dados disponíveis** na tabela associada ao cliente.\n2. **Extrair e retornar o máximo de informações possíveis**, mantendo o conteúdo rico, contextualizado e tecnicamente detalhado.  \n   - Traga **descrições completas**, **relacionamentos entre os dados** e **interpretações relevantes** que ajudem a entender o contexto do negócio.  \n   - Inclua **todas as informações que possam ser relevantes** sobre produtos, serviços, clientes, histórico, desempenho, métricas ou comunicações.  \n3. **Não resuma**. Sua resposta deve ser **densa e detalhada**, preservando a complexidade e a profundidade das informações encontradas.  \n4. **Não altere, atualize ou chame nenhuma ferramenta** — este agente é apenas para **consulta e leitura**.  \n5. Caso não existam dados disponíveis ou eles sejam irrelevantes, responda apenas:\n   > “Ainda não há nenhum conhecimento disponível para este cliente.”\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -608,
+        976
+      ],
+      "id": "0ea0efb6-73b6-4e2b-a84e-2f750e60bb44",
+      "name": "BuscaConhecimentoRAG"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3a4549d4-3be8-48cc-bacf-d5b2ff198984",
+              "name": "response",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1904,
+        1648
+      ],
+      "id": "27310456-77a6-4e88-94f2-428c1e9b0114",
+      "name": "setTextoImagem"
+    },
+    {
+      "parameters": {
+        "content": "Verifica se tem midia na mensagem, Verifica se a IA do chat ta ativa,  se a conexão ta ativa, se o plano do user não é basico e se a mensagem não é do user, se tem o user já fez sua configuração da base conhecimento",
+        "height": 232,
+        "width": 688,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        1520
+      ],
+      "id": "1bff7a14-9ef7-48cc-b9c9-851384d721aa",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Seta Dados e Verifica tipo de mensagem",
+        "height": 252,
+        "width": 328,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1632
+      ],
+      "id": "5fde6930-3504-4381-9775-4df8441dcbe9",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "content": "Busca Base de Conhecimento do User",
+        "height": 524,
+        "width": 488,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        864
+      ],
+      "id": "f0052242-24af-47cb-8d00-42b7b37e85e1",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use a tabela a seguir para buscar conhecimento.\nEste banco de RAG contém diferentes tipos de dados, incluindo:\n\nBinários de PDFs, que podem conter documentos e informações visuais.\n\nArquivos JSON extraídos de planilhas (XLS), usados para representar dados estruturados.\n\nArquivos TXT de dados, com informações textuais processáveis.\n\nArquivos TXT com formato “Conversa: ...”, que podem representar diálogos ou simplesmente interações textuais que também servem como fonte de conhecimento.",
+        "tableName": "={{ 'empresa_' + $('Code in JavaScript2').item.json.IdAssinante.replace(/-/g, '_') }}",
+        "topK": 100,
+        "options": {
+          "columnNames": {
+            "values": {
+              "contentColumnName": "content"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        -512,
+        1120
+      ],
+      "id": "5e909dfb-4d1e-4827-bca2-8b9c6af8aa34",
+      "name": "Postgres PGVector Store",
+      "credentials": {
+        "postgres": {
+          "id": "kKrKEAwJ1bFlBjvh",
+          "name": "Postgres NKW FLOW RAG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Agente para criar resposta com base no conhecimento do user, prompt da conexão do user, mensagem etc",
+        "height": 604,
+        "width": 520,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        848
+      ],
+      "id": "d29ec2c6-3a42-4431-917a-5fda1e08fba2",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "Splita e Envia resposta como se fosse um humano",
+        "height": 604,
+        "width": 1320,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        352,
+        848
+      ],
+      "id": "eeff8aae-8da0-46b5-878c-96dbb99fc864",
+      "name": "Sticky Note19"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\nconst fullResponse = $('OrganizaResposta').first().json.output?.trim() || \"\";\n\n// Divide o texto em frases (strings individuais)\nconst sentences = fullResponse\n  .split(/(?<=[.?!])\\s+|\\n\\s*\\n|\\n(?=[A-Z])/)\n  .map(s => s.trim())\n  .filter(s => s.length > 0);\n\n// Caso não tenha divisões válidas, mantém o texto inteiro\nitem.json.messagesToSend = sentences.length > 0 ? sentences : [fullResponse];\n\nreturn [item];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        2112
+      ],
+      "id": "3aeb3001-34ef-4b3e-a153-a757e5600266",
+      "name": "DivideMensagem1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -576,
+        2304
+      ],
+      "id": "76996213-a30f-4f80-bf1c-877134abee25",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.user_id}}",
+        "sessionTTL": 86400,
+        "contextWindowLength": 80
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        -352,
+        2304
+      ],
+      "id": "35532c21-f524-47aa-9aac-b8721fc66a4a",
+      "name": "Redis Chat Memory1",
+      "credentials": {
+        "redis": {
+          "id": "HKZAYOJcf2nDh0xI",
+          "name": "Cache NKW FLOW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Fluxo da tela de ajuda",
+        "height": 456,
+        "width": 1136,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        2048
+      ],
+      "id": "491be4c4-1724-4f05-957a-a96fef5a509d",
+      "name": "Sticky Note20"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "help",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        2112
+      ],
+      "id": "b5871c58-10c7-4df5-b847-1298753a7d0c",
+      "name": "ChegaMensagemAjuda",
+      "webhookId": "8032ba1f-104f-4fd0-8c47-435e5d1db1cb"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        144,
+        2112
+      ],
+      "id": "64783266-84d6-414b-9edf-22e93456071d",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={\n  \"mensagemRecebida\": \"{{ $json.body.mensagem}}\"\n}\n",
+        "options": {
+          "systemMessage": "💬 Estilo de Resposta (Sua Regra Principal)\nSeu objetivo é soar como um humano prestativo em um chat, não como um robô lendo um manual.\n\nSeja Natural: Responda de forma direta e amigável.\n\nSeja Breve: Suas respostas devem ter no máximo duas frases curtas, separadas por um ponto final (.).\n\nEvite: \"Para cadastrar um novo atendente, você deve navegar até a tela 'Atendentes' e preencher os campos de nome, e-mail, senha e a conexão associada.\"\n\nPrefira: \"É bem simples. Basta ir na tela 'Atendentes' e preencher os dados do novo usuário.\"\n\n🧠 Entradas\nmensagemRecebida: A mensagem que o usuário enviou no chat de ajuda. Você deve usar o Estilo de Resposta acima para auxiliá-lo.\n\n🤖 Sua Identidade\nVocê é o assistente oficial do NKW Flow, uma plataforma SaaS de automação de conversas via WhatsApp. Seu papel é ajudar usuários a entender, configurar e usar o sistema, usando o contexto abaixo.\n\n📚 Contexto da Plataforma (Sua Base de Conhecimento)\n\n🧭 Documentação do Usuário — Plataforma NKW Flow\n\n🌐 Visão Geral\n\nO NKW Flow é uma plataforma SaaS que centraliza e automatiza atendimentos via WhatsApp, combinando inteligência artificial e intervenção humana.\n\nSeu objetivo é facilitar a comunicação entre empresas e clientes, mantendo histórico, personalização e agilidade — tudo em um único painel.\n\nAtravés do NKW Flow, você pode:\n\nConectar múltiplos números de WhatsApp da sua empresa.\n\nCadastrar atendentes humanos e gerenciar suas conversas.\n\nConfigurar agentes de IA com diferentes estilos de comunicação nas suas conexões ( Números do WhatsApp Conectado ).\n\nAutomatizar as respostas com base na sua base de conhecimento.\n\nAcompanhar métricas de atendimento das conexões.\n\nConfigurar notificações para atendentes, modificar aparência e preferências da plataforma.\n\n🚀 Início Rápido\n\n1. Criação de Conta e Acesso\n\nApós contratar um plano na página de vendas do NKW Flow, o sistema cria automaticamente seu usuário.\nVocê receberá um e-mail com seu login e senha, gerados assim que o pagamento é confirmado pela Stripe.\n\nO primeiro acesso é feito pelo link:\n👉 app.nkwflow.com\n\n🧱 Estrutura da Plataforma\n\nAo acessar o painel, você verá uma interface semelhante ao WhatsApp Web, com menu lateral à esquerda (sidebar) e a área principal à direita.\n\nA sidebar contém dois grupos de menus:\n\n🔸 Menu Principal\n\n- Resumo\n\n- Conversas\n\n- Atendentes\n\n- Agentes\n\n- Conexões\n\n🔸 Menu de Suporte\n\n- Configurações\n\n- Recompensas\n\n- Ajuda\n\nO layout pode ser exibido em modo escuro (padrão) ou modo claro, e a sidebar pode estar em modo Full (com textos) ou Minimal (somente ícones).\n\n📊 Tela de Resumo\n\nA tela de Resumo é o painel inicial da plataforma.\n\nNela você encontra:\n\nQuantidade de chats novos, chats fechados, chats por atendente e chats por conexão.\n\nNo topo há um botão “Quero ajuda” que leva à Central de Ajuda.\n\n💬 Tela de Conversas\n\nA tela Conversas é o coração da plataforma, onde toda a comunicação acontece.\n\n🧾 Estrutura\n\nLista de chats à esquerda (com busca por nome ou telefone).\n\nJanela de chat (chat window) à direita, com histórico completo.\n\nBubbles de mensagem semelhante ao whatsapp web, com data, hora e etc\n\nCada chat mostra:\n\nNome e número do contato.\n\nÚltima mensagem e data/hora.\n\nStatus do agente (IA ativada ou não).\n\n✉️ Funções principais\n\nEnviar mensagens, áudios, documentos e imagens.\n\nApagar mensagens e visualizar mensagens deletadas.\n\nFechar chats (somente admins ou atendentes responsáveis).\n\nReabri chats automaticamente quando o cliente envia nova mensagem.\n\nAtivar ou desativar a IA manualmente (botão no canto inferior da janela).\n\nFiltros:\n\nPor atendente\n\nPor status da IA\n\nPor conexão\n\nPor chat aberto/fechado\n\nPor “meus chats” (chats que você assumiu )\n\n📌 Dica: Quando um atendente humano envia uma mensagem em um chat que estava com a IA ativa, a IA é pausada automaticamente até o chat ser reaberto.\n\n🤖 Tela de Agentes\n\nOs Agentes são as inteligências artificiais que respondem seus clientes.\nCada agente possui um prompt personalizado, ou seja, um estilo e tom de resposta.\n\nExemplos:\n\nAgente Recepcionista — cumprimenta e coleta informações.\n\nAgente Suporte — responde dúvidas técnicas.\n\nAgente Vendas — conduz ofertas e conversões.\n\n⚙️ Nesta tela você pode:\n\nVer todos os agentes disponíveis conforme seu plano.\n\nVer o status da sua base de conhecimento.\n\nBaixar um resumo da base de conhecimento.\n\nCada agente pode ser atribuído a uma conexão WhatsApp específica.\n\nOs agentes vão usar seu próprio tom de conversa junto com a sua base de conhecimento e o contexto de cada conversa com seus clientes.\n\n👥 Tela de Atendentes\n\nNesta tela você gerencia sua equipe humana.\n\n🔧 Recursos\n\nCadastrar novos atendentes (nome, e-mail, senha, número e conexão associada).\n\nCada atendente tem login próprio e vê somente os chats da conexão associada.\n\nNotificações são enviadas para o número do atendente quando há um chat que exige intervenção humana.\n\nFiltros para exibir atendentes ativos e inativos.\n\n🧠 Importante: Cada atendente deve estar vinculado a uma conexão específica.\n\n🔗 Tela de Conexões\n\nAqui você conecta e gerencia seus números de WhatsApp.\n\n🧩 Recursos\n\nConectar via QR Code ou código alfanumérico.\n\nDefinir um agente de IA responsável por aquela conexão.\n\nConsultar status (online/offline).\n\nEditar ou excluir conexões.\n\nFiltrar por conexões ativas/inativas.\n\n📱 Cada conexão representa um número de WhatsApp que sua empresa usa, podendo ser de diferentes filiais ou departamentos.\n\n⚙️ Tela de Configurações\n\nA tela de Configurações possui duas seções principais:\n\n🧍 Conta\n\nNome, cargo e endereço.\n\nE-mail e plano contratado.\n\nBotões:\n\nEditar informações (nome, cidade, endereço e senha).\n\nGerenciar assinatura (abre o painel da Stripe).\n\nLogout.\n\n⚡ Preferências\n\nAtivar/desativar notificações de atendentes.\n\nMostrar nomes dos remetentes nas mensagens.\n\nDefinir uma palavra-chave da IA — se o chat estiver com IA desativada, basta enviar essa palavra pelo WhatsApp para reativá-la automaticamente.\n\nAlternar modo de tela (claro/escuro).\n\nAlternar modo da sidebar (Full/Minimal).\n\n🎁 Tela de Recompensas\n\nAtualmente a tela de Recompensas é apenas visual, mas em breve permitirá:\n\nGeração de links de indicação.\n\nRecebimento de cashback em novas assinaturas.\n\nDescontos progressivos de até 40% na mensalidade.\n\n🆘 Tela de Ajuda\n\nA Central de Ajuda integra um chatbot inteligente, onde você pode tirar dúvidas sobre:\n\nConfiguração de conexões.\n\nCadastro de atendentes e agentes.\n\nUso da IA e preferências.\n\nE qualquer outra dúvida sobre o nkw flow\n\nBasta digitar sua pergunta e o sistema irá gerar uma resposta automaticamente com base em informações oficiais da aplicação.\n\n🧩 Como a IA Funciona (em linguagem simples)\n\nQuando um cliente envia mensagem no seu WhatsApp, o NKW Flow recebe esse evento.\n\nO sistema identifica de qual conexão veio a mensagem e qual agente de IA está associado.\n\nA IA analisa:\n\nO prompt configurado do agente.\n\nO resumo da sua base de conhecimento.\n\nO contexto da conversa armazenado.\n\nA resposta é gerada pela IA dentro dos fluxos automatizados do N8N.\n\nA mensagem é enviada de volta ao cliente pelo mesmo número WhatsApp conectado.\n\nTudo isso ocorre, de forma fluida e humanizada.\n\n📈 Planos Disponíveis\n\nBásico - 400 reais:\n\nApenas 2 atendentes humanos\n\nSem resposta de IA\n\nAté duas conexões de whatsApp\n\n\nIntermediário - 700 reais:\n\n4 Conexões\n\n2 Agentes de IA\n\n4 Atendentes Humanos\n\n\nPremium - 900 reais\n\n6 Conexões\n\n4 Agentes de IA\n\n6 Atendentes Humanos\n\n\nEmpresarial\t\n\nCustomizável, com agentes e automações sob demanda.\n\n\n\n🧭 Dicas Gerais de Uso\n\nMantenha suas conexões online para garantir que os clientes sejam atendidos.\n\nTreine bem sua base de conhecimento respondendo as informações no whatsapp conversando com nosso numero oficial, quanto mais dados, mais precisa será a IA.\n\nCaso algo não funcione, acesse a tela de ajuda ou contate o suporte.\n\n💡 Conclusão\n\nO NKW Flow une automação inteligente e controle humano em um ambiente único e intuitivo.\n\nCom ele, sua empresa pode:\n\nCentralizar atendimentos em tempo real.\n\nPersonalizar a comunicação de cada unidade.\n\nGanhar produtividade com respostas automáticas precisas.\n\nGerenciar equipes e clientes com eficiência.\n\n\nRegras factuais obrigatórias (não altere)\n\nAgentes: Não existe cadastro de agentes pelo usuário. Os agentes disponíveis são fornecidos pelo plano contratado do usuário; o assistente deve indicar apenas os agentes permitidos pelo plano vigente.\n\nAdicionar Conexão: Para adicionar uma conexão o usuário deve ir em \"Adicionar Conexão\"; serão exibidos dois botões: Conectar via QR Code e Conectar via Código Alfanumérico.\n\nFluxo após escolher método: Após o usuário selecionar um dos botões, o sistema solicita: nome da conexão, agente (selecionado entre os agentes disponíveis no plano) e número (este último obrigatório somente quando o usuário escolheu conectar via código).\n\nVisibilidade das mensagens: Todas as mensagens enviadas e recebidas pelas conexões conectadas ficam visíveis dentro da plataforma — independentemente de terem sido disparadas pelo WhatsApp mobile, WhatsApp Web ou enviadas diretamente dentro da própria plataforma.\n\nTreinamento da base de conhecimento: O usuário treina sua própria base de conhecimento conversando via WhatsApp com o número de suporte do NKW Flow; ao contratar, o usuário recebe uma mensagem do suporte no número pessoal informado na assinatura e, por essa conversa, vai inserindo/treinando a base que a IA consumirá. O suporte avisará quando o processo estiver finalizado.\n\n🔄 Ajustes e Observações Adicionais\n\n1. Tela de Conexões\nNão é possível editar uma conexão e alterar seu status diretamente no formulário de edição ou na tabela, a conexão pode estar aguardando escaneamento, ativa ou desativada automaticamente, se estiver desativada o usuário deve apagar a mesma e criar uma nova.\nEsse status muda automaticamente caso a conexão com o WhatsApp caia.\n\n2. Dinâmica de Atendentes e Chats\nQuando um atendente humano (ou admin) envia uma mensagem em um chat, a IA é desativada automaticamente e o chat passa a ter um “dono”.\nA partir daí, apenas o dono pode liberar ou fechar o chat.\nOutros atendentes e administradores conseguem visualizar esses chats, mas não podem interagir até que o dono libere."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        2112
+      ],
+      "id": "46a9df49-ef97-438a-a478-9d453894a64b",
+      "name": "OrganizaResposta"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f3c2a9dd-252c-4ee1-ab47-77c7c8b6190c",
+              "name": "resposta",
+              "value": "={{ $json.messagesToSend }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        2112
+      ],
+      "id": "57fcb6b4-f615-42cc-8030-585ce9101f56",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ffdb455-f3a7-42f9-9b2c-b070aabb05d0",
+              "leftValue": "={{ $json.event.connection.status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "36998707-da5a-4986-ab12-4da2d9f8a1d3",
+              "leftValue": "={{ $json.event.subscription.plano }}",
+              "rightValue": "basico",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "f6aacccc-ae69-4c78-a058-c7bad727ba90",
+              "leftValue": "={{ $json.event.chat.ia_ativa }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "2428d0ed-76ac-4c66-9d7f-a7539496650d",
+              "leftValue": "={{ $json.event.data.key.fromMe }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "a9aa873c-d0b9-4aed-8f19-9275e3ebe1b4",
+              "leftValue": "={{ $json.event.ragData.status_conhecimento }}",
+              "rightValue": "Ótimo",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        1616
+      ],
+      "id": "1a58f6ff-a36c-4c4d-aece-7f70be69454f",
+      "name": "Confere1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b8e26a9f-dde8-423d-8a09-4e247c936185",
+              "leftValue": "={{ $json.output.isChamaAtendente }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        1072
+      ],
+      "id": "06d071b5-c02b-42ab-8e61-0d17b1e484db",
+      "name": "chamaAtendente"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        1152
+      ],
+      "id": "77b35879-4515-46c7-92a8-31cac2fb00bd",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution.nkwflow.com/message/sendText/{{ $('Code in JavaScript2').item.json.connectionId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "XJNTxYD3cxrlP01phcVGdBTGdF0Xt5"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.numero }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.mensagem }}"
+            },
+            {
+              "name": "delay",
+              "value": "={{ 5000 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        1168
+      ],
+      "id": "db81077f-26fb-45d4-94d3-78f6cacfbbb1",
+      "name": "RequisiçãoEnviaMSG1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\nlet atendentes = $('Code in JavaScript2').item.json.numerosAtendentes; // fallback caso venha vazio\n\n// Garante que seja array\nif (!Array.isArray(atendentes)) {\n  atendentes = [atendentes];\n}\n\n// Cria uma lista de objetos para o SplitInBatches\nreturn atendentes.map(numero => ({\n  json: {\n    numero,\n    mensagem: `Olá, tudo bem? Veio te notificar para assumir a conversa no NKW FLOW, segue o número: ${ $('Code in JavaScript2').item.json.contatoNumero }`\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        1168
+      ],
+      "id": "caeb4f06-2d0d-4e13-9cfc-665cc586d906",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "let text = $json.output;\n\n// Garante que o valor é uma string\nif (typeof text !== 'string') {\n  return [{ json: { output: text } }];\n}\n\n// Remove blocos de código e espaços extras\ntext = text.replace(/```json|```/g, '').trim();\n\n// Tenta fazer o parse do JSON\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (e) {\n  parsed = {\n    resposta: \"Erro ao interpretar resposta da IA.\",\n    isChamaAtendente: true\n  };\n}\n\n// Retorna objeto limpo\nreturn [{ json: { output: parsed } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        944
+      ],
+      "id": "a5da3576-a479-41b3-a878-ad490ca33047",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\nlet events = $('ChegouEvento').first().json.body.events; \n\n// Garante que seja array\nif (!Array.isArray(events)) {\n  events = [events];\n}\n\n// Cria uma lista de objetos para o SplitInBatches\nreturn events.map(event => ({\n  json: {\n    event\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        1600
+      ],
+      "id": "0bf535e6-bb47-4d64-934e-28d66106f58c",
+      "name": "DivideEventos"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -112,
+        1600
+      ],
+      "id": "f8b52f9b-dd10-4147-9e93-25c1b8e4f100",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega todos os itens da entrada como um array\nconst allItems = $input.all();\n\n// Pega o JSON do *primeiro* item para usarmos como base\n// para os dados \"estáticos\" (IdAssinante, promptAgente, etc.)\nconst firstItem = $input.first().json;\n\n// --- 1. Concatenação dos Campos Dinâmicos ---\n\n// Mapeia todos os 'mensagemTexto', remove nulos/vazios e junta com nova linha\nconst mensagensTexto = allItems\n  .map(item => item.json.mensagemTexto)\n  .filter(Boolean) // 'Boolean' remove valores nulos, vazios, undefined\n  .join('\\n');\n\n// Mapeia todos os 'TextoImagem', remove nulos/vazios e junta com nova linha\nconst textosImagem = allItems\n  .map(item => item.json.TextoImagem)\n  .filter(Boolean)\n  .join('\\n');\n\n// Mapeia todos os 'TextoAudio', remove nulos/vazios e junta com nova linha\nconst textosAudio = allItems\n  .map(item => item.json.TextoAudio)\n  .filter(Boolean)\n  .join('\\n');\n\n// --- 2. Montagem do Objeto de Saída ---\n\n// Retorna um novo objeto.\n// Incluímos os campos estáticos do 'firstItem' um por um\n// e depois adicionamos os nossos campos concatenados.\nreturn {\n  // Dados estáticos do primeiro item:\n  IdAssinante: firstItem.IdAssinante,\n  tipoMensagem: firstItem.tipoMensagem,\n  promptAgente: firstItem.promptAgente,\n  numerosAtendentes: firstItem.numerosAtendentes,\n  chatId: firstItem.chatId,\n  contatoNumero: firstItem.contatoNumero,\n  connectionId: firstItem.connectionId,\n  mensagemCitada: firstItem.mensagemCitada,\n  \n  // Campos dinâmicos (concatenados):\n  mensagemTexto: mensagensTexto,\n  TextoImagem: textosImagem,\n  TextoAudio: textosAudio\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        976
+      ],
+      "id": "8998b528-9b0f-4e1a-b450-409148c3d406",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "421a0da4-3d06-4afb-8eb3-a333cbb3f2ed",
+              "leftValue": "={{ $('ChegouEvento').first().json.body.event }}",
+              "rightValue": "connection.update",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        1680
+      ],
+      "id": "2119e4b4-fdf7-4e5b-ac15-66f8a5b51ef0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{  $('ChegouEvento').first().json.body.data.state }}",
+                    "rightValue": "close",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a70737d3-abc9-4f4b-8bc3-ac1edaa033c6"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4d985b00-6c2f-441d-901d-0dcb153c90d4",
+                    "leftValue": "={{  $('ChegouEvento').first().json.body.data.state }}",
+                    "rightValue": "connecting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        448,
+        1872
+      ],
+      "id": "1267ab3c-6d61-41d5-b06d-60a8acb0252b",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution.nkwflow.com/instance/restart/{{$('ChegouEvento').first().json.body.data.instance}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "XJNTxYD3cxrlP01phcVGdBTGdF0Xt5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        2016
+      ],
+      "id": "68c9f06b-e24d-45a0-8402-1e7614f31b71",
+      "name": "RequestRestart",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        1328
+      ],
+      "id": "c8e1e28d-494a-4be8-bc34-b125f19ce5dc",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "1IUwLDeNBTMyuZMV",
+          "name": "NKW FLOW"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RequisiçãoEnviaMSG": {
+      "main": [
+        [
+          {
+            "node": "RodaTodasMSG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RodaTodasMSG": {
+      "main": [
+        [],
+        [
+          {
+            "node": "RequisiçãoEnviaMSG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitaEmItens": {
+      "main": [
+        [
+          {
+            "node": "RodaTodasMSG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DivideMensagem": {
+      "main": [
+        [
+          {
+            "node": "SplitaEmItens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Segue": {
+      "main": [
+        [
+          {
+            "node": "DadosUteis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "temMidia?": {
+      "main": [
+        [
+          {
+            "node": "Segue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RequestPegaBase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DadosUteis": {
+      "main": [
+        [
+          {
+            "node": "TipoMensagem1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Segue1": {
+      "main": [
+        [
+          {
+            "node": "DadosUteis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ConvertBase64Binario3": {
+      "main": [
+        [
+          {
+            "node": "TranscreveAudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DescreveIMG": {
+      "main": [
+        [
+          {
+            "node": "setTextoImagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TranscreveAudio": {
+      "main": [
+        [
+          {
+            "node": "DadosUteis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RequestPegaBase": {
+      "main": [
+        [
+          {
+            "node": "DadosUteis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TipoMensagem1": {
+      "main": [
+        [
+          {
+            "node": "Segue1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DescreveIMG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ConvertBase64Binario3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChegouEvento": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ConnectionCaiu": {
+      "main": [
+        [
+          {
+            "node": "RequestRestart",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "RequestDELETE": {
+      "main": [
+        []
+      ]
+    },
+    "DadosUteis2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "BuscaConhecimentoRAG",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuscaConhecimentoRAG": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setTextoImagem": {
+      "main": [
+        [
+          {
+            "node": "DadosUteis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres PGVector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "BuscaConhecimentoRAG",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DivideMensagem1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "OrganizaResposta",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "OrganizaResposta",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChegaMensagemAjuda": {
+      "main": [
+        [
+          {
+            "node": "OrganizaResposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OrganizaResposta": {
+      "main": [
+        [
+          {
+            "node": "DivideMensagem1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confere1": {
+      "main": [
+        [
+          {
+            "node": "temMidia?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "chamaAtendente": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "RequisiçãoEnviaMSG1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RequisiçãoEnviaMSG1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "DivideMensagem",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "chamaAtendente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DivideEventos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confere1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "BuscaConhecimentoRAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DivideEventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Postgres PGVector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "13ff5664-4c15-4c10-ad7b-6c386d7c7241",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "97893750eb83bbe925298a7ba078ab9ba3c8f82fc6bca048d44d332f02f4fdcf"
+  },
+  "id": "d7kDjEzWo0VJRii6",
+  "tags": []
+}

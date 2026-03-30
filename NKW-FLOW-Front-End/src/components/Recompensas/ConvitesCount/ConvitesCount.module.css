@@ -1,0 +1,35 @@
+.containerCountConvites {
+    height: 100%;
+    width: 300px;
+    background-color: var(--color-background-dark);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+.containerCountConvites h2 {
+  font-size: 15px;
+  opacity: .6;
+  color: var(--color-text);
+}
+.containerCountConvites p {
+  font-size: 20px;
+  font-family: var(--font-main);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+@media (max-width: 991.98px) {
+    .containerCountConvites p {
+        font-size: 16px;
+    }
+    .containerCountConvites {
+      width: 90%;
+    }
+}
+@media (max-width: 599.98px) {
+    .containerCountConvites {
+      padding: 16px 0;
+    }
+}

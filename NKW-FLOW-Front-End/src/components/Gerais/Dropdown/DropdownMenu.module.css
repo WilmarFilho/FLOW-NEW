@@ -1,0 +1,141 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.dropdownWrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.headerWrapper {
+  position: relative;
+}
+
+.messageWrapper {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  animation: fadeIn .2s forwards;
+  pointer-events: none;
+}
+
+.messageWrapper .actionButton,
+.messageWrapper .menu {
+  pointer-events: auto;
+}
+
+.actionButton button svg {
+  width: 70%;
+}
+
+.actionButton button {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-black);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
+}
+
+.menu {
+  position: absolute;
+  background: var(--color-chat-dropdown);
+  border-radius: 8px;
+  list-style: none;
+  padding: 12px;
+  margin: 0;
+  width: 260px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.menuTop {
+  top: auto !important;
+  bottom: calc(100% + 14px);
+}
+
+.menuBottom {
+  bottom: auto !important;
+  top: calc(100% + 14px);
+}
+
+.menuRight {
+  left: auto !important;
+  right: 14px;
+}
+
+.menuLeft {
+  right: auto !important;
+  left: 14px;
+}
+
+.menu button {
+  padding: 20px;
+  width: 100%;
+  color: var(--color-text);
+  cursor: pointer;
+  border: none;
+  display: flex;
+  font-size: 16px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  outline: none;
+  background: var(--color-background-chats-options);
+  text-align: left;
+}
+
+.menu button svg {
+  width: 24px;
+  fill: var(--color-text);
+}
+
+.menu button:hover {
+  background: var(--color-background-white);
+  transition: .3s;
+}
+
+@media (max-width: 1204.98px) {
+  .menuLeft {
+    left: -46px;
+  }
+}
+
+@media (max-width: 664.98px) {
+  .menu {
+    width: 180px;
+  }
+}
+
+
+@media (max-width: 400.98px) {
+  .menuLeft {
+    left: -100px;
+  }
+
+  .menu button {
+    font-size: 12px;
+    padding: 12px;
+  }
+}

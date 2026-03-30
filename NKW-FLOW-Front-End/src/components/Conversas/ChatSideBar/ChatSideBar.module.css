@@ -1,0 +1,225 @@
+.chatSidebar {
+  border-radius: 20px;
+  width: 30%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--color-background-dark);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+}
+.wrapperSearchBar {
+  display: flex;
+  gap: 8px;
+}
+.buttonAddChat {
+  border-radius: 12px;
+  cursor: pointer;
+  width: 100px;
+  border: none;
+  outline: none;
+  background-color: var(--color-background-white);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.buttonAddChat:hover {
+  background-color: var(--color-secundaria);
+  transition: .3s;
+  fill: red;
+}
+.buttonAddChat:hover  svg {
+  fill: var(--color-text-white);
+}
+.ChatFilterButton {
+  background-color: var(--color-background-white);
+  text-transform: uppercase;
+  gap: 16px;
+  padding: 12px 32px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  border: none;
+  outline: none;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  line-height: 22px;
+  opacity: .6;
+  /* Define um tamanho de fonte base */
+  color: var(--color-button-searchbar);
+}
+.ChatFilterButton:hover {
+  background-color: var(--color-background-tags-hover);
+  transition: .2s;
+  color: var(--color-text-white);
+}
+.ChatFilterButton:focus {
+  border: none;
+  outline: none;
+}
+.ChatFilterButton.active {
+  background-color: var(--color-primary);
+  color: var(--color-text-white);
+}
+.ChatFilterButton::after {
+  content: attr(data-label);
+}
+.buttonAddChat svg,
+.ChatFilterButton svg {
+  fill: var(--color-button-searchbar);
+  width: 22px;
+  height: 20px;
+}
+.iaFilterContainer {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+.tagsContainer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  width: 100%;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+.chatList {
+  overflow-y: scroll;
+  height: 100%;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chatList::-webkit-scrollbar {
+  display: none;
+}
+.statusToggleContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.attendantsSection {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  height: 70px;
+}
+.attendantItem {
+  min-width: 190px;
+  border-radius: 12px;
+  cursor: pointer;
+  background-color: var(--color-background-white);
+  color: var(--color-button-searchbar);
+  display: flex;
+  height: 100%;
+  font-size: 14px;
+  font-family: var(--font-main);
+  justify-content: center;
+  padding: 0px 12px;
+  text-transform: uppercase;
+  align-items: center;
+  transition: .2s;
+}
+.attendantItem.active {
+  background-color: var(--color-secundaria);
+  color: var(--color-text-white);
+  font-weight: 350;
+  opacity: 1;
+  flex: 1;
+  min-width: 140px;
+}
+.loadMore {
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-align: center;
+  padding: 24px 0;
+  gap: 22px;
+  width: 100%;
+  opacity: .7;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid white;
+  border-top: 3px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@media (max-width: 1421.98px) {
+  .chatSidebar {
+    width: 35%;
+  }
+  .ChatFilterButton {
+    font-size: 13px;
+    line-height: 18px;
+    padding: 12px 24px;
+  }
+}
+@media (max-width: 1211.98px) {
+  .ChatFilterButton {
+    font-size: 12px;
+    line-height: 16px;
+    padding: 12px 22px;
+  }
+}
+@media (max-width: 991.98px) {
+  .chatSidebar {
+    width: 100%;
+  }
+  .tagsContainer {
+    padding-bottom: 16px;
+  }
+  .ChatFilterButton {
+    padding: 16px;
+  }
+}
+@media (max-width: 599.98px) {
+  .ChatFilterButton::after {
+    content: attr(data-label-short);
+  }
+  .chatList {
+    height: 55%;
+  }
+  .statusToggleContainer {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+  }
+}
+@media (max-width: 464.98px) {
+  .chatSidebar {
+    padding: 10px;
+    gap: 8px;
+  }
+  .tagsContainer {
+    padding-bottom: 8px;
+  }
+  .ChatFilterButton {
+    letter-spacing: 0px;
+  }
+}

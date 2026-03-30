@@ -1,0 +1,97 @@
+.metricCard,
+.metricCardSmall {
+  width: 100%;
+  border-radius: 12px;
+  color: var(--color-text);
+  background-color: var(--color-background-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.3s ease;
+  padding: 40px;
+}
+.metricCardSmall {
+  flex: 1;
+}
+.metricCard:hover,
+.metricCardSmall:hover {
+  transform: scale(0.98);
+}
+.metricCardHeader {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.metricCardTitles {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 14px;
+}
+.metricCardTitles h2 {
+  font-size: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-family: var(--font-main);
+  text-transform: uppercase;
+  margin: 0;
+}
+.metricCardTitles h2 svg {
+  width: 20px;
+  height: 20px;
+}
+.metricCardTitles h3 {
+  font-size: 36px;
+  font-family: var(--font-main);
+  color: var(--color-secundaria);
+  text-transform: uppercase;
+  margin: 0;
+}
+.metricCardFooterStat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.metricCardFooterStat span {
+  opacity: 0.5;
+  font-size: 14px;
+}
+.metricCardFooterStat strong {
+  display: flex;
+  gap: 8px;
+  border: 1px solid var(--color-filter-attendants);
+  background-color: var(--color-filter-attendants);
+  align-items: center;
+  border-radius: 100px;
+  opacity: 0.6;
+  font-size: 14px;
+  padding: 4px 18px;
+}
+.metricCardFooterStat strong svg {
+  width: 20px;
+}
+@media (max-width: 1399.98px) {
+
+  .metricCard,
+  .metricCardSmall {
+    padding: 16px;
+  }
+}
+@media (max-width: 767.98px) {
+  .metricCardTitles h2 {
+    font-size: 18px;
+  }
+}
+@media (max-width: 497.98px) {
+  .metricCardHeader {
+    flex-direction: column;
+    gap: 24px;
+  }
+  .metricCard, .metricCardSmall {
+    padding: 24px;
+  }
+}
