@@ -11,6 +11,7 @@
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   min-height: calc(100vh - 120px);
+  height: 100%;
 }
 
 /* Page Header */
@@ -62,7 +63,7 @@
 .filterBar {
   display: flex;
   gap: 10px;
-  margin-bottom: 24px;
+  margin-bottom: 38px;
   flex-wrap: wrap;
 }
 
@@ -77,16 +78,10 @@
   transition: all 0.25s ease;
 }
 
-.filterChip:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
 .filterChipActive {
   background: var(--color-secondary);
   border-color: var(--color-secondary);
   color: var(--color-aux-black);
-  font-weight: 600;
 }
 
 /* Connection Grid */
@@ -98,7 +93,7 @@
 
 /* Connection Card — Solid background (glass container is behind) */
 .card {
-  background: var(--color-surface-card);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -120,7 +115,7 @@
 }
 
 .cardConnected::before {
-  background: linear-gradient(90deg, var(--color-secondary), var(--color-success));
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-secondary));
 }
 
 .cardConnecting::before {
@@ -196,8 +191,15 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* Card Meta Row */
@@ -293,8 +295,13 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal {
@@ -310,8 +317,15 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modalHeader {
@@ -539,7 +553,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */
@@ -792,12 +808,27 @@
   animation: typingBounce 1.4s ease-in-out infinite;
 }
 
-.chatTyping span:nth-child(2) { animation-delay: 0.2s; }
-.chatTyping span:nth-child(3) { animation-delay: 0.4s; }
+.chatTyping span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chatTyping span:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 @keyframes typingBounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-6px); opacity: 1; }
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
 }
 
 /* Chat Input */
@@ -856,21 +887,70 @@
   cursor: not-allowed;
 }
 
-/* Loading Spinner */
-.loadingSpinner {
-  display: flex;
-  justify-content: center;
-  padding: 60px;
+/* ========================================
+   Loading Overlay — Blur + Centered Spinner
+   ======================================== */
+.contentBlurred {
+  pointer-events: none;
+  user-select: none;
 }
 
-.loadingSpinner::after {
-  content: '';
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #1269f4;
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  gap: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.loadingSpinnerRing {
+  width: 52px;
+  height: 52px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--color-secondary);
+  border-right-color: rgba(18, 105, 244, 0.5);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  box-shadow:
+    0 0 20px rgba(242, 228, 22, 0.15),
+    inset 0 0 20px rgba(18, 105, 244, 0.05);
+}
+
+.loadingMessage {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.loadingMessage::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.15),
+      transparent);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+
+  100% {
+    left: 100%;
+  }
 }
 
 /* ========================================

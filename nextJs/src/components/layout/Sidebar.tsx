@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Users, MessageSquare, Settings, HelpCircle, ChevronLeft, ChevronRight, LogOut, Award, Menu, MessageCircle, BookOpen, UserCircle, Calendar, BookOpenText } from 'lucide-react';
+import { Bot, Send, Home, Users, MessageSquare, Settings, HelpCircle, ChevronLeft, ChevronRight, LogOut, Award, Menu, MessageCircle, BookOpen, UserCircle, Calendar, BookOpenText } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import styles from './Sidebar.module.css';
 
@@ -56,8 +56,10 @@ export default function Sidebar({ user }: SidebarProps) {
     { label: 'Conversas', icon: MessageSquare, href: '/conversas', section: 'principal' },
     { label: 'WhatsApps', icon: MessageCircle, href: '/whatsapp', section: 'principal' },
     { label: 'Contatos', icon: UserCircle, href: '/contatos', section: 'principal' },
+    { label: 'Campanhas', icon: Send, href: '/campanhas', section: 'principal' },
     { label: 'Conhecimentos', icon: BookOpenText, href: '/conhecimentos', section: 'principal' },
     { label: 'Agendamentos', icon: Calendar, href: '/agendamentos', section: 'principal' },
+    { label: 'Agentes IA', icon: Bot, href: '/agentes-ia', section: 'principal' },
     { label: 'Atendentes', icon: Users, href: '/atendentes', section: 'principal' },
   ];
 
@@ -137,7 +139,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
             <button onClick={handleLogout} className={`${styles.actionItem} ${styles.danger}`} title="Sair">
               <LogOut size={isVisuallyExpanded ? 22 : 24} />
-              {isVisuallyExpanded && <span className={styles.fadeText}>Sair do Sistema</span>}
+              {isVisuallyExpanded && <span className={styles.fadeText}>Sair</span>}
             </button>
           </div>
 
@@ -155,7 +157,7 @@ export default function Sidebar({ user }: SidebarProps) {
                 {user.email && <span className={styles.userEmail}>{user.email}</span>}
                 <div className={styles.planBadge}>
                   <Award size={12} style={{ marginRight: 4 }} />
-                  {user.plano.toUpperCase()}
+                  {user.plano.toUpperCase() === 'FREEMIUM' ? 'GRÁTIS' : user.plano.toUpperCase()}
                 </div>
               </div>
             </div>

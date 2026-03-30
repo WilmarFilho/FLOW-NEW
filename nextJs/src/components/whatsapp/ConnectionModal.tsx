@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, QrCode, Smartphone, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import CustomSelect from './CustomSelect';
 import styles from './WhatsappPage.module.css';
 import type { WhatsappConnection } from './ConnectionCard';
 
@@ -248,34 +249,37 @@ export default function ConnectionModal({
 
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Agente IA (opcional)</label>
-              <select
-                className={styles.formSelect}
+              <CustomSelect
                 value={agenteId}
-                onChange={(e) => setAgenteId(e.target.value)}
-              >
-                <option value="">Nenhum agente</option>
-                {agentes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nome} — {a.tipo_de_agente}
-                  </option>
-                ))}
-              </select>
+                onChange={setAgenteId}
+                placeholder="Nenhum agente"
+                searchable={agentes.length > 5}
+                options={[
+                  { value: '', label: 'Nenhum agente' },
+                  ...agentes.map((a) => ({
+                    value: a.id,
+                    label: a.nome,
+                    sublabel: a.tipo_de_agente,
+                  })),
+                ]}
+              />
             </div>
 
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Base de Conhecimento (opcional)</label>
-              <select
-                className={styles.formSelect}
+              <CustomSelect
                 value={conhecimentoId}
-                onChange={(e) => setConhecimentoId(e.target.value)}
-              >
-                <option value="">Nenhum conhecimento</option>
-                {conhecimentos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.titulo}
-                  </option>
-                ))}
-              </select>
+                onChange={setConhecimentoId}
+                placeholder="Nenhum conhecimento"
+                searchable={conhecimentos.length > 5}
+                options={[
+                  { value: '', label: 'Nenhum conhecimento' },
+                  ...conhecimentos.map((c) => ({
+                    value: c.id,
+                    label: c.titulo,
+                  })),
+                ]}
+              />
             </div>
 
             {error && <p className={styles.formError}>{error}</p>}

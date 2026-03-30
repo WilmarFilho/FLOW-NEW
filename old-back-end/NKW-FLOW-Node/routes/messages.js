@@ -5,7 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const { authMiddleware } = require('../middleware/auth'); // middleware de autenticação
+const { authMiddleware } = require('../middleware/auth.js'); // middleware de autenticação
 const { eventClientsByUser } = require('./events.js');
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
@@ -266,8 +266,8 @@ router.post('/help', authMiddleware, async (req, res) => {
 
   } catch (err) {
     console.error('Erro ao enviar mensagem para webhook de ajuda:', err.response?.data || err.message);
-  
-    return res.status(500).json({ 
+
+    return res.status(500).json({
       error: 'Erro ao processar mensagem de ajuda',
       details: err.response?.data || err.message
     });

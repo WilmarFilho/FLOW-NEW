@@ -38,7 +38,7 @@ describe('Sidebar Component', () => {
 
   it('renders the sidebar with correct user information', () => {
     render(<Sidebar user={mockUser} />);
-    
+
     // Check if user info is displayed
     expect(screen.getByText('Test')).toBeInTheDocument(); // splits the name 'Test User' -> 'Test'
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('Sidebar Component', () => {
 
   it('navigates to the correct links', () => {
     render(<Sidebar user={mockUser} />);
-    
+
     // Verify Dashboard link is rendered and active based on pathname mock
     const dashboardLink = screen.getByText('Dashboard').closest('a');
     expect(dashboardLink).toHaveAttribute('href', '/home');
@@ -55,12 +55,12 @@ describe('Sidebar Component', () => {
 
   it('calls supabase signout when logout is clicked', async () => {
     render(<Sidebar user={mockUser} />);
-    
-    const logoutBtn = screen.getByText('Sair do Sistema').closest('button');
+
+    const logoutBtn = screen.getByText('Sair').closest('button');
     expect(logoutBtn).toBeInTheDocument();
-    
+
     fireEvent.click(logoutBtn!);
-    
+
     expect(supabase.auth.signOut).toHaveBeenCalled();
     // Due to async nature of handleLogout waiting on signout, we might need waitFor or similar 
     // but synchronous check is fine for the spy if we await inside the event callback,

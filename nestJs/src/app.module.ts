@@ -7,6 +7,7 @@ import { LogsModule } from './logs/logs.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { ConhecimentosModule } from './conhecimentos/conhecimentos.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     SupabaseModule,
     LogsModule,
     WhatsappModule,
+    ConhecimentosModule,
   ],
   controllers: [AppController],
   providers: [
