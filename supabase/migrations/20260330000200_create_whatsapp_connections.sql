@@ -9,7 +9,7 @@ CREATE TABLE public.whatsapp_connections (
   numero TEXT,
   status TEXT CHECK (status IN ('connected', 'disconnected', 'connecting')) DEFAULT 'disconnected',
   instance_name TEXT UNIQUE,
-  agente_id UUID NULL REFERENCES public.agentes(id) ON DELETE SET NULL,
+  agente_id UUID NULL REFERENCES public.agentes_ia(id) ON DELETE SET NULL,
   conhecimento_id UUID NULL REFERENCES public.conhecimentos(id) ON DELETE SET NULL,
   ultima_atualizacao TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),

@@ -1,0 +1,360 @@
+/* ========================================
+   ConfiguracoesPage — Design System
+   ======================================== */
+
+.pageContainer {
+  padding: 36px 40px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.titleArea h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.titleArea p {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 4px 0 0 0;
+  text-wrap: balance;
+}
+
+/* ─── Tabs ─── */
+.tabsContainer {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 2px;
+}
+
+.tabButton {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 16px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabButton:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tabButton.active {
+  color: #fff;
+}
+
+.tabIndicator {
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-primary);
+  border-radius: 4px 4px 0 0;
+}
+
+/* ─── Content Area ─── */
+.contentArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.tabPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Form & Sections ─── */
+.section {
+  background: #ffffff18;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroup label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #fff;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.input[disabled],
+.input.readOnly {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Profile Picture Upload ─── */
+.avatarSection {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.avatarWrapper {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.avatarOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  color: #fff;
+}
+
+.avatarWrapper:hover .avatarOverlay {
+  opacity: 1;
+}
+
+.avatarActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.avatarActions p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.uploadButton,
+.hiddenFileInput {
+  cursor: pointer;
+}
+
+.hiddenFileInput {
+  display: none;
+}
+
+.uploadBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uploadBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Save Actions ─── */
+.formActions {
+  margin-top: 32px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.saveBtn {
+  padding: 14px 28px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(18, 105, 244, 0.3);
+}
+
+.saveBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(18, 105, 244, 0.4);
+}
+
+.saveBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ─── System Items Mock ─── */
+.settingItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settingItem:last-child {
+  border-bottom: none;
+}
+
+.settingInfo h4 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  color: #fff;
+}
+
+.settingInfo p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.toggleSwitch {
+  width: 48px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggleSwitch.active {
+  background: var(--color-primary);
+}
+
+.toggleKnob {
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.toggleSwitch.active .toggleKnob {
+  transform: translateX(24px);
+}
+
+.selectInput {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.selectInput option {
+  background: #111;
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

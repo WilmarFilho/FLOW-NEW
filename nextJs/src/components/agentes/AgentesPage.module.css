@@ -1,0 +1,334 @@
+/* ========================================
+   AgentesPage — Design System
+   ======================================== */
+
+/* Page Wrapper — Glass Container */
+.pageContainer {
+  padding: 36px 40px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  min-height: calc(100vh - 120px);
+  display: flex;
+  height: fit-content;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.contentWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.titleArea h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.titleArea p {
+  font-size: 15px;
+  text-wrap: balance;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 4px 0 0 0;
+}
+
+/* ========================================
+   Loading Overlay
+   ======================================== */
+.contentBlurred {
+  pointer-events: none;
+  user-select: none;
+  filter: blur(6px);
+  opacity: 0.5;
+  transition: all 0.4s ease;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  gap: 20px;
+}
+
+.loadingSpinnerRing {
+  width: 52px;
+  height: 52px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--color-secondary);
+  border-right-color: rgba(18, 105, 244, 0.5);
+  border-radius: 50%;
+  animation: spin 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  box-shadow:
+    0 0 20px rgba(242, 228, 22, 0.15),
+    inset 0 0 20px rgba(18, 105, 244, 0.05);
+}
+
+.loadingMessage {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.3px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Grid ─── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+  flex: 1;
+}
+
+/* ─── Agente Card ─── */
+.card {
+  background: #ffffff18;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--color-secondary);
+  transition: background 0.3s ease;
+  opacity: 0.5;
+}
+
+.card:hover {
+  transform: translateY(-4px) scale(1.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cardTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.cardDesc {
+  font-size: 14px;
+  text-wrap: balance;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.cardFooter {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detailsBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.card:hover .detailsBtn {
+  background: var(--color-secondary);
+  color: var(--color-surface);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Modal ─── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--gradient-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 32px;
+}
+
+.modalContent::-webkit-scrollbar {
+  display: none;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.modalIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modalTitleArea h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px 0;
+}
+
+.modalTitleArea p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.formGroup {
+  margin-bottom: 24px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.promptTextarea {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: none;
+  min-height: 450px;
+  height: auto;
+  outline: none;
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.promptTextarea::-webkit-scrollbar {
+  display: none;
+}
+
+.promptTextarea:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 32px;
+}
+
+.closeBtn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+
+@media (max-width: 668px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+}

@@ -25,11 +25,10 @@ const fetchConnections = async (uid: string) => {
   return (await res.json()) as WhatsappConnection[];
 };
 
-const fetchAgentes = async (uid: string) => {
+const fetchAgentes = async () => {
   const { data, error } = await supabase
-    .from('agentes')
-    .select('id, nome, tipo_de_agente')
-    .eq('user_id', uid);
+    .from('agentes_ia')
+    .select('id, nome, descricao');
   if (error) throw error;
   return data || [];
 };
@@ -215,8 +214,8 @@ export default function WhatsappPage() {
   );
 
   const { data: agentes = [], isLoading: isLoadingAgentes } = useSWR(
-    userId ? ['whatsapp:agentes', userId] : null,
-    ([, uid]) => fetchAgentes(uid),
+    'whatsapp:agentes',
+    fetchAgentes,
     SWR_OPTIONS
   );
 

@@ -13,7 +13,7 @@ export class WhatsappService {
     private readonly supabaseService: SupabaseService,
     private readonly evolutionApi: EvolutionApiService,
     private readonly logsService: LogsService,
-  ) {}
+  ) { }
 
   /**
    * Lista todas as conexões de um usuário
@@ -22,7 +22,7 @@ export class WhatsappService {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
-      .select('*, agentes(id, nome, tipo_de_agente), conhecimentos(id, titulo)')
+      .select('*, agentes_ia(id, nome), conhecimentos(id, titulo)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

@@ -26,6 +26,7 @@
 
 .titleArea h1 {
   font-size: 28px;
+  line-height: 1.2;
   font-weight: 700;
   color: #fff;
   margin: 0;
@@ -197,7 +198,7 @@
 
 /* ─── Knowledge Card ─── */
 .card {
-  background: var(--color-surface);
+  background: #ffffff18;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;

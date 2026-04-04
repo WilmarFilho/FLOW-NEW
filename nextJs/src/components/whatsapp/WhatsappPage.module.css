@@ -313,8 +313,14 @@
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 32px;
   animation: slideUp 0.3s ease;
+}
+
+.modal::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes slideUp {
@@ -467,6 +473,104 @@
   color: #f87171;
   font-size: 13px;
   margin-top: 6px;
+}
+
+/* Custom Picker */
+.pickerContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pickerSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.pickerSearch:focus-within {
+  border-color: #1269f4;
+  background: rgba(18, 105, 244, 0.05);
+}
+
+.pickerSearchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 14px;
+}
+
+.pickerSearchInput::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.pickerList::-webkit-scrollbar {
+  width: 4px;
+}
+.pickerList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.pickerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.pickerBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.pickerBtnActive {
+  background: rgba(18, 105, 244, 0.1);
+  border-color: #1269f4;
+}
+
+.pickerBtnContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pickerBtnTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.pickerBtnSubtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* Submit Button in Modals */

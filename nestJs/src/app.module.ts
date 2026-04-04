@@ -10,6 +10,8 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ConhecimentosModule } from './conhecimentos/conhecimentos.module';
 import { AtendentesModule } from './atendentes/atendentes.module';
 import { HelpModule } from './help/help.module';
+import { AgentesIaModule } from './agentes-ia/agentes-ia.module';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { HelpModule } from './help/help.module';
     ConhecimentosModule,
     AtendentesModule,
     HelpModule,
+    AgentesIaModule,
+    ProfileModule,
   ],
   controllers: [AppController],
   providers: [

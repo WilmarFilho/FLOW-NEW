@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, QrCode, Smartphone, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import CustomSelect from './CustomSelect';
+import SearchablePicker from './SearchablePicker';
 import styles from './WhatsappPage.module.css';
 import type { WhatsappConnection } from './ConnectionCard';
 
@@ -12,7 +12,7 @@ interface ConnectionModalProps {
   onClose: () => void;
   editMode?: boolean;
   connection?: WhatsappConnection | null;
-  agentes: { id: string; nome: string; tipo_de_agente: string }[];
+  agentes: { id: string; nome: string; descricao?: string }[];
   conhecimentos: { id: string; titulo: string }[];
   onSubmit: (data: {
     nome: string;
@@ -36,7 +36,7 @@ export default function ConnectionModal({
   onUpdate,
   onCancelConnection,
 }: ConnectionModalProps) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(editMode ? 2 : 1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(editMode ? 2 : 1);
   const [useQR, setUseQR] = useState(true);
   const [nome, setNome] = useState(connection?.nome || '');
   const [numero, setNumero] = useState(connection?.numero || '');
@@ -69,7 +69,7 @@ export default function ConnectionModal({
 
   // Realtime: escuta mudança de status da conexão pendente
   useEffect(() => {
-    if (!pendingConnectionId || step !== 3) return;
+    if (!pendingConnectionId || step !== 5) return;
 
     const channel = supabase
       .channel(`modal-connection-${pendingConnectionId}`)
@@ -84,7 +84,7 @@ export default function ConnectionModal({
           const updated = payload.new as any;
           if (updated.id === pendingConnectionId && updated.status === 'connected') {
             setIsConnected(true);
-            setStep(4); // Step de sucesso
+            setStep(6); // Step de sucesso
           }
         }
       )
@@ -103,8 +103,8 @@ export default function ConnectionModal({
   };
 
   const handleClose = async () => {
-    // Se está no step 3 (aguardando conexão) e NÃO conectou, deletar a conexão fantasma
-    if (step === 3 && pendingConnectionId && !isConnected) {
+    // Se está no step 5 (aguardando conexão) e NÃO conectou, deletar a conexão fantasma
+    if (step === 5 && pendingConnectionId && !isConnected) {
       try {
         await onCancelConnection(pendingConnectionId);
       } catch {
@@ -163,7 +163,7 @@ export default function ConnectionModal({
           setQrCode(result.qrCode || null);
           setPairingCode(result.pairingCode || null);
           setPendingConnectionId(result.connectionId || null);
-          setStep(3);
+          setStep(5);
         }
       }
     } catch (err) {
@@ -178,13 +178,13 @@ export default function ConnectionModal({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
-            {step === 4
+            {step === 6
               ? 'Conectado!'
               : editMode
                 ? 'Editar Conexão'
-                : step === 3
+                : step === 5
                   ? 'Conecte seu WhatsApp'
-                  : 'Nova Conexão'}
+                  : step === 1 ? 'Nova Conexão' : 'Configurar Conexão'}
           </h2>
           <button className={styles.modalCloseBtn} onClick={handleClose}>
             <X size={20} />
@@ -216,7 +216,7 @@ export default function ConnectionModal({
           </div>
         )}
 
-        {/* Step 2 — Formulário */}
+        {/* Step 2 — Identificação */}
         {step === 2 && (
           <>
             <div className={styles.formGroup}>
@@ -247,55 +247,108 @@ export default function ConnectionModal({
               </div>
             )}
 
+            {error && <p className={styles.formError}>{error}</p>}
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className={styles.cancelBtn} onClick={() => setStep(1)}>
+                Voltar
+              </button>
+              <button
+                className={styles.submitBtn}
+                style={{ marginTop: 0 }}
+                onClick={() => {
+                  if (!nome.trim()) {
+                    setError('Informe o nome da conexão');
+                    return;
+                  }
+                  if (!useQR && !numero.trim()) {
+                    setError('Informe o número do WhatsApp para pareamento');
+                    return;
+                  }
+                  setError('');
+                  setStep(3);
+                }}
+              >
+                Avançar
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3 — Agente IA */}
+        {step === 3 && (
+          <>
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Agente IA (opcional)</label>
-              <CustomSelect
+              <label className={styles.formLabel}>Atribuir Agente IA (opcional)</label>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: -4, marginBottom: 12, textWrap: 'balance' }}>
+                Opcionalmente, associe um agente para dar direcionamento nas respostas nesta conexão.
+              </p>
+              <SearchablePicker
                 value={agenteId}
                 onChange={setAgenteId}
-                placeholder="Nenhum agente"
-                searchable={agentes.length > 5}
-                options={[
-                  { value: '', label: 'Nenhum agente' },
-                  ...agentes.map((a) => ({
-                    value: a.id,
-                    label: a.nome,
-                    sublabel: a.tipo_de_agente,
-                  })),
-                ]}
+                placeholder="Buscar agente..."
+                options={agentes.map((a) => ({
+                  id: a.id,
+                  title: a.nome,
+                  subtitle: a.descricao || 'Agente de IA',
+                }))}
               />
             </div>
 
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className={styles.cancelBtn} onClick={() => setStep(2)}>
+                Voltar
+              </button>
+              <button
+                className={styles.submitBtn}
+                style={{ marginTop: 0 }}
+                onClick={() => setStep(4)}
+              >
+                Avançar
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Step 4 — Base de Conhecimento */}
+        {step === 4 && (
+          <>
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Base de Conhecimento (opcional)</label>
-              <CustomSelect
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: -4, marginBottom: 12, textWrap: 'balance' }}>
+                Opcionalmente, associe uma base de conhecimento para que o agente tenha contexto sobre o seu negócio.
+              </p>
+              <SearchablePicker
                 value={conhecimentoId}
                 onChange={setConhecimentoId}
-                placeholder="Nenhum conhecimento"
-                searchable={conhecimentos.length > 5}
-                options={[
-                  { value: '', label: 'Nenhum conhecimento' },
-                  ...conhecimentos.map((c) => ({
-                    value: c.id,
-                    label: c.titulo,
-                  })),
-                ]}
+                placeholder="Buscar base de conhecimento..."
+                options={conhecimentos.map((c) => ({
+                  id: c.id,
+                  title: c.titulo,
+                }))}
               />
             </div>
 
             {error && <p className={styles.formError}>{error}</p>}
 
-            <button
-              className={styles.submitBtn}
-              onClick={handleFormSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Processando...' : editMode ? 'Salvar Alterações' : 'Gerar Conexão'}
-            </button>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className={styles.cancelBtn} onClick={() => setStep(3)} disabled={isLoading}>
+                Voltar
+              </button>
+              <button
+                className={styles.submitBtn}
+                style={{ marginTop: 0 }}
+                onClick={handleFormSubmit}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processando...' : editMode ? 'Salvar Alterações' : 'Gerar Conexão'}
+              </button>
+            </div>
           </>
         )}
 
-        {/* Step 3 — QR Code ou Pairing Code */}
-        {step === 3 && (
+        {/* Step 5 — QR Code ou Pairing Code */}
+        {step === 5 && (
           <div className={styles.qrContainer}>
             {qrCode && (
               <>
@@ -320,8 +373,8 @@ export default function ConnectionModal({
           </div>
         )}
 
-        {/* Step 4 — Sucesso */}
-        {step === 4 && (
+        {/* Step 6 — Sucesso */}
+        {step === 6 && (
           <div className={styles.qrContainer}>
             <div style={{
               width: 80,
