@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 import { useRecoilValue } from 'recoil';
 import { userState } from '../../../state/atom';
 import { menuItems } from '../../../hooks/utils/useMenuItens';

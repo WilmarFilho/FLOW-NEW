@@ -9,6 +9,7 @@ import {
   Put,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConhecimentosService } from './conhecimentos.service';
@@ -17,10 +18,13 @@ import {
   UpdateConhecimentoDto,
   SendMessageDto,
 } from './dto/conhecimento.dto';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @Controller('conhecimentos')
+@UseGuards(AdminGuard)
 export class ConhecimentosController {
   constructor(private readonly service: ConhecimentosService) {}
+
 
   /** GET /conhecimentos — Lista bases do usuário */
   @Get()

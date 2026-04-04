@@ -1,0 +1,26 @@
+# Central de Ajuda FLOW - Base de Conhecimento
+
+O FLOW é uma plataforma inteligente de gestão de mensagens e automação para WhatsApp.
+
+1. CONEXÕES (WHATSAPP):
+- Você pode conectar várias instâncias de WhatsApp escaneando o QR Code.
+- O status "Conectado" indica que o sistema está pronto para enviar/receber mensagens.
+- Se a conexão cair, você verá o status "Desconectado" ou "QR Code Necessário".
+
+2. ATENDENTES:
+- O administrador pode criar contas de atendentes para sua equipe.
+- Cada atendente pode ser vinculado a conexões de WhatsApp específicas.
+- Atendentes têm acesso restrito e só conseguem ver o módulo de Conversas.
+- Somente o administrador pode redefinir a senha de um atendente ou excluí-lo.
+
+3. CONHECIMENTOS:
+- O módulo de conhecimentos permite treinar sua IA com documentos (PDF, TXT, DOCX) ou fotos.
+- A IA usa esses dados para responder clientes de forma personalizada.
+
+4. ASSINATURAS E PLANOS:
+- Atendentes herdam o plano do seu administrador.
+- Se o plano do administrador expirar, os atendentes também perderão acesso a funcionalidades pagas.
+
+5. SUPORTE:
+- Para falar com um humano, use o botão "Fale Conosco" na tela de ajuda.
+- O suporte funciona de segunda a sexta, das 09h às 18h.

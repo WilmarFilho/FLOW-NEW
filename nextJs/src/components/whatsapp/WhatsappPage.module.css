@@ -11,7 +11,8 @@
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   min-height: calc(100vh - 120px);
-  height: 100%;
+  height: fit-content;
+  min-height: 100%;
 }
 
 /* Page Header */

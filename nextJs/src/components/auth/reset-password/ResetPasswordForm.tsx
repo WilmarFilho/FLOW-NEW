@@ -14,10 +14,27 @@ export default function ResetPasswordForm({ onSwitchView }: ResetPasswordFormPro
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [tipoUsuario, setTipoUsuario] = useState<string>('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from('profile').select('tipo_de_usuario').eq('auth_id', user.id).single()
+          .then(({ data }) => {
+            if (data?.tipo_de_usuario === 'atendente') {
+              setTipoUsuario('atendente');
+              setErrorMessage('Somente seu administrador pode alterar sua senha.');
+            }
+          });
+      }
+    });
+  }, []);
 
   // If we are doing implicit flow with hash fragment, we can just update user password:
   const handleUpdatePassword = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (tipoUsuario === 'atendente') return;
+    
     setErrorMessage(null);
     setSuccessMessage(null);
 
@@ -69,7 +86,7 @@ export default function ResetPasswordForm({ onSwitchView }: ResetPasswordFormPro
         value={senha}
         onChange={(e) => setSenha(e.target.value)}
         placeholder="Nova Senha"
-        disabled={loading}
+        disabled={loading || tipoUsuario === 'atendente'}
         onKeyDown={handleKeyDown}
       />
       <input
@@ -77,7 +94,7 @@ export default function ResetPasswordForm({ onSwitchView }: ResetPasswordFormPro
         value={confirmarSenha}
         onChange={(e) => setConfirmarSenha(e.target.value)}
         placeholder="Confirmar Nova Senha"
-        disabled={loading}
+        disabled={loading || tipoUsuario === 'atendente'}
         onKeyDown={handleKeyDown}
       />
 

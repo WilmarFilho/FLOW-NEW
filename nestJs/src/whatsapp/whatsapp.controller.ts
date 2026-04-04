@@ -7,11 +7,13 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import { UpdateWhatsappDto } from './dto/update-whatsapp.dto';
 import { TestMessageDto } from './dto/test-message.dto';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -22,6 +24,7 @@ export class WhatsappController {
    * Lista conexões do usuário (user_id vem do header por ora)
    */
   @Get()
+  @UseGuards(AdminGuard)
   async listConnections(@Headers('x-user-id') userId: string) {
     return this.whatsappService.listConnections(userId);
   }
@@ -31,6 +34,7 @@ export class WhatsappController {
    * Cria nova instância + conexão
    */
   @Post()
+  @UseGuards(AdminGuard)
   async createConnection(
     @Headers('x-user-id') userId: string,
     @Body() dto: CreateWhatsappDto,
@@ -44,6 +48,7 @@ export class WhatsappController {
    * Edita uma conexão existente
    */
   @Put(':id')
+  @UseGuards(AdminGuard)
   async updateConnection(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string,
@@ -57,6 +62,7 @@ export class WhatsappController {
    * Deleta conexão e instância na Evolution
    */
   @Delete(':id')
+  @UseGuards(AdminGuard)
   async deleteConnection(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string,
@@ -69,6 +75,7 @@ export class WhatsappController {
    * Envia mensagem de teste
    */
   @Post(':id/test')
+  @UseGuards(AdminGuard)
   async sendTestMessage(
     @Param('id') id: string,
     @Headers('x-user-id') userId: string,

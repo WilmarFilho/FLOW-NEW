@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import Styles from './MetricCard.module.css';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 
 interface MetricCardProps {
   title: string;

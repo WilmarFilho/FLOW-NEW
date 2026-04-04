@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 // Icon
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 // CSS Modules
 import styles from './Searchbar.module.css';
 

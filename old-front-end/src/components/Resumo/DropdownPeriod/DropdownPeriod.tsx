@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Css
 import Styles from './DropdownPeriod.module.css'
 // Icon
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 
 export type ViewType = 'weekly' | 'monthly';
 export type DropdownId = string | null;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/auth/useAuth';
 import styles from './LoginForm.module.css';
-import Icon from '../../components/Gerais/Icons/Icons';
+import Icon from '../Gerais/Icons/Icons';
 
 interface ApiError {
   response?: {

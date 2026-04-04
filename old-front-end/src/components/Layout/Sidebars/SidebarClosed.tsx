@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 import { useRecoilValue } from 'recoil';
 import { userState } from '../../../state/atom';
 import { menuItems } from '../../../hooks/utils/useMenuItens';
 
 const SidebarClosed = () => {
   const user = useRecoilValue(userState);
-  
+
   if (!user) return null;
 
   const userPlano = (user.plano || '').toLowerCase() as 'basico' | 'intermediario' | 'premium';

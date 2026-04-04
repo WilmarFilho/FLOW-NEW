@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Select, { OnChangeValue } from 'react-select';
-import Icon from '../../components/Gerais/Icons/Icons';
+import Icon from '../Gerais/Icons/Icons';
 import type { AttendantFormData } from '../../types/attendant';
 import { validateAttendantForm } from '../../hooks/utils/useValidator';
 

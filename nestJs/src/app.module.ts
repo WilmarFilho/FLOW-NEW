@@ -8,6 +8,8 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ConhecimentosModule } from './conhecimentos/conhecimentos.module';
+import { AtendentesModule } from './atendentes/atendentes.module';
+import { HelpModule } from './help/help.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { ConhecimentosModule } from './conhecimentos/conhecimentos.module';
     LogsModule,
     WhatsappModule,
     ConhecimentosModule,
+    AtendentesModule,
+    HelpModule,
   ],
   controllers: [AppController],
   providers: [

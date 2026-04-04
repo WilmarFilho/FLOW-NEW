@@ -14,7 +14,7 @@ import styles from './ChatSideBar.module.css';
 // Atom
 import { chatFiltersState, userState } from '../../../state/atom';
 // Icons
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 
 interface ChatSidebarProps {
   chats: Chat[] | null;
@@ -56,7 +56,7 @@ function ChatSidebar({
 }: ChatSidebarProps) {
   // ✨ Substituir múltiplos useStates pelo atom global de filtros
   const [filters, setFilters] = useRecoilState(chatFiltersState);
-  
+
   const user = useRecoilValue(userState);
   const listRef = useRef<HTMLDivElement | null>(null);
 

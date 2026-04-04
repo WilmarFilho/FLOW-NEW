@@ -27,7 +27,7 @@ export default function Sidebar({ user }: SidebarProps) {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      if (width < 500) {
+      if (width < 550) {
         setIsMobile(true);
         // Em mobile a sidebar sai da tela e abre só via hamburger
       } else {
@@ -68,6 +68,11 @@ export default function Sidebar({ user }: SidebarProps) {
     { label: 'Ajuda', icon: HelpCircle, href: '/ajuda', section: 'suporte' },
   ];
 
+  const isAtendente = user.tipo_de_usuario === 'atendente';
+  const filteredMenuItems = isAtendente
+    ? menuItems.filter(item => item.href === '/conversas')
+    : menuItems;
+
   const sidebarVisible = isMobile ? mobileMenuOpen : true;
   const isVisuallyExpanded = isMobile ? true : expanded;
 
@@ -101,7 +106,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
           <nav className={styles.navGroup}>
             {isVisuallyExpanded && <h4>Menu Principal</h4>}
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               return (

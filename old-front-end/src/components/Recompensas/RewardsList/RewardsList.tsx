@@ -1,5 +1,5 @@
 import Styles from './RewardsList.module.css';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 
 interface Reward {
   tier: number;
@@ -20,11 +20,10 @@ export default function RewardsList({ rewards, totalIndicacoes }: RewardsListPro
       {rewards.map((reward) => (
         <div
           key={reward.tier}
-          className={`${Styles.boxReward} ${
-            totalIndicacoes >= reward.goal
+          className={`${Styles.boxReward} ${totalIndicacoes >= reward.goal
               ? Styles.boxRewardUnlock
               : Styles.boxRewardLocked
-          }`}
+            }`}
         >
           <div className={Styles.rowContainerRewards}>
             <Icon nome="medal" />

@@ -119,7 +119,7 @@
 }
 
 .bottomSection {
-  margin-top: auto;
+  margin-top: 10px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -235,7 +235,7 @@
 }
 
 /* Responsividade Mobile Topbar e Sliding Drawer */
-@media (max-width: 500px) {
+@media (max-width: 550px) {
   .sidebar {
     display: none;
     /* Só exibe por drawer via mobileSidebar */

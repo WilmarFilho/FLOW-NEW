@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 import { validateUserForm } from '../../../hooks/utils/useValidator';
 import DefaultImage from '../assets/default.webp'
 

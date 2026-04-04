@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { useChats } from '../chats/useChats';
-import { useMessages } from '../../hooks/chats/useMessages';
+import { useMessages } from '../chats/useMessages';
 import useMessagesActions from '../chats/useMessagesActions';
 import useChatActions from '../chats/useChatActions';
 import {
@@ -42,7 +42,7 @@ export function useConversasPage() {
   const { reOpenChat, deleteChat, renameChat, toggleIA, claimChatOwner, releaseChatOwner } = useChatActions();
 
   const { messages, fetchMoreMessages, hasMore, isLoading } = useMessages(activeChat?.id || null);
-  
+
   const handleReleaseChatOwner = useCallback(async () => {
     if (!activeChat || !activeChat.user_id) return;
     const updated = await releaseChatOwner(activeChat.id);

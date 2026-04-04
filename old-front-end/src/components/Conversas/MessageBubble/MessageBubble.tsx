@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from './MessageBubble.module.css';
-import Icon from '../../../components/Gerais/Icons/Icons';
-import { DropdownMenu } from '../../../components/Gerais/Dropdown/DropdownMenu';
-import { useDropdownMenu } from '../../../components/Gerais/Dropdown/DropdownMenuContext';
+import Icon from '../../Gerais/Icons/Icons';
+import { DropdownMenu } from '../../Gerais/Dropdown/DropdownMenu';
+import { useDropdownMenu } from '../../Gerais/Dropdown/DropdownMenuContext';
 import { CustomAudioPlayer } from './CustomAudioPlayer';
 
 interface MessageBubbleProps {

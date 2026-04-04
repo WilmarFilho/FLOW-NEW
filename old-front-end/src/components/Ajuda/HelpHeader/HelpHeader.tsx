@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import GlobalStyles from '../../../global.module.css'
-import Button from '../../../components/Gerais/Buttons/Button';
+import Button from '../../Gerais/Buttons/Button';
 
 export default function HelpHeader() {
   return (

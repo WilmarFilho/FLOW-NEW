@@ -10,7 +10,7 @@ import Icon from '../../Gerais/Icons/Icons';
 import defaultAvatar from '../assets/default.webp';
 import styles from './ChatWindow.module.css';
 import FormStyles from '../../Gerais/Form/form.module.css';
-import { DropdownMenu } from '../../../components/Gerais/Dropdown/DropdownMenu';
+import { DropdownMenu } from '../../Gerais/Dropdown/DropdownMenu';
 import { useRecoilValue } from 'recoil';
 import { userState } from '../../../state/atom';
 import {

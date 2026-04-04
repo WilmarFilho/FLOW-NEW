@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import styles from './MessageBubble.module.css';
 import defaultAvatar from '../assets/default.webp';
-import Icon from '../../../components/Gerais/Icons/Icons';
+import Icon from '../../Gerais/Icons/Icons';
 
 interface Props {
   sender: 'me' | 'other';
