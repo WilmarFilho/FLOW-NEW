@@ -1,5 +1,9 @@
 import styles from './Sidebar.module.css';
 
+export const metadata = {
+  title: 'Home | FLOW',
+};
+
 export default function HomePage() {
   return (
     <div>

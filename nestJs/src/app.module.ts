@@ -15,6 +15,8 @@ import { ProfileModule } from './profile/profile.module';
 import { AgendamentosModule } from './agendamentos/agendamentos.module';
 import { GoogleModule } from './google/google.module';
 
+import { ContatosModule } from './contatos/contatos.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -28,6 +30,7 @@ import { GoogleModule } from './google/google.module';
     ProfileModule,
     AgendamentosModule,
     GoogleModule,
+    ContatosModule,
   ],
   controllers: [AppController],
   providers: [

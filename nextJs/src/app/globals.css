@@ -106,3 +106,16 @@ body {
 [data-sonner-toast][data-type="error"] [data-icon] {
   color: #e8e8e8 !important;
 }
+
+/* ========================================
+   Scrollbar Utilities
+   ======================================== */
+
+/* Oculta scrollbar completamente (cross-browser) */
+.scrollbar-none {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge legado */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari / Edge */
+}
