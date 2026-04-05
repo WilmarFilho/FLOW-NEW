@@ -43,6 +43,7 @@ export class AtendentesService {
       .insert({
         admin_id: adminId,
         profile_id: newUser.user.id,
+        numero: data.numero || null,
         whatsapp_ids: data.whatsapp_ids || []
       });
 
@@ -96,7 +97,10 @@ export class AtendentesService {
     // 4. Update WhatsApp IDs in atendentes table
     const { error: updateLinkErr } = await supabase
       .from('atendentes')
-      .update({ whatsapp_ids: data.whatsapp_ids || [] })
+      .update({
+        numero: data.numero || null,
+        whatsapp_ids: data.whatsapp_ids || []
+      })
       .eq('id', id);
 
     if (updateLinkErr) {
@@ -139,6 +143,7 @@ export class AtendentesService {
       .select(`
         id,
         created_at,
+        numero,
         whatsapp_ids,
         profile!profile_id (
           auth_id,

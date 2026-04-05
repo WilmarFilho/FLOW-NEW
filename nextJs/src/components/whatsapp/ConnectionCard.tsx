@@ -11,6 +11,11 @@ export interface WhatsappConnection {
   instance_name: string;
   agente_id: string | null;
   conhecimento_id: string | null;
+  business_hours?: {
+    timezone?: string;
+    days?: Record<string, Array<{ start: string; end: string }>>;
+  };
+  appointment_slot_minutes?: number;
   agentes?: { id: string; nome: string; tipo_de_agente: string } | null;
   conhecimentos?: { id: string; titulo: string } | null;
 }
@@ -40,6 +45,9 @@ export default function ConnectionCard({ connection, onEdit, onDelete, onTest }:
     connecting: styles.cardConnecting,
     disconnected: styles.cardDisconnected,
   }[connection.status];
+  const businessDays = Object.entries(connection.business_hours?.days || {}).filter(
+    ([, windows]) => Array.isArray(windows) && windows.length > 0,
+  ).length;
 
   return (
     <div className={`${styles.card} ${cardClass}`}>
@@ -69,6 +77,15 @@ export default function ConnectionCard({ connection, onEdit, onDelete, onTest }:
           <span>Conhecimento:</span>
           <span className={styles.metaValue}>
             {connection.conhecimentos?.titulo || 'Nenhum'}
+          </span>
+        </div>
+        <div className={styles.metaItem}>
+          <BookOpen size={14} />
+          <span>Agenda:</span>
+          <span className={styles.metaValue}>
+            {businessDays > 0
+              ? `${businessDays} dia(s) configurados • ${connection.appointment_slot_minutes || 60} min`
+              : 'Sem horario definido'}
           </span>
         </div>
       </div>

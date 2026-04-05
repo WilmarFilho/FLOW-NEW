@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, QrCode, Smartphone, CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle, QrCode, Smartphone, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import SearchablePicker from './SearchablePicker';
 import styles from './WhatsappPage.module.css';
@@ -19,10 +19,80 @@ interface ConnectionModalProps {
     numero?: string;
     agente_id?: string;
     conhecimento_id?: string;
+    business_hours?: {
+      timezone?: string;
+      days?: Record<string, Array<{ start: string; end: string }>>;
+    };
+    appointment_slot_minutes?: number;
     useQR: boolean;
   }) => Promise<{ qrCode?: string | null; pairingCode?: string | null; connectionId?: string | null } | null>;
-  onUpdate: (id: string, data: { nome?: string; agente_id?: string; conhecimento_id?: string }) => Promise<void>;
+  onUpdate: (
+    id: string,
+    data: {
+      nome?: string;
+      agente_id?: string;
+      conhecimento_id?: string;
+      business_hours?: {
+        timezone?: string;
+        days?: Record<string, Array<{ start: string; end: string }>>;
+      };
+      appointment_slot_minutes?: number;
+    },
+  ) => Promise<void>;
   onCancelConnection: (connectionId: string) => Promise<void>;
+}
+
+type BusinessHours = {
+  timezone?: string;
+  days?: Record<string, Array<{ start: string; end: string }>>;
+};
+
+type ModalStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+const WEEKDAY_OPTIONS = [
+  { key: 'monday', label: 'Segunda' },
+  { key: 'tuesday', label: 'Terca' },
+  { key: 'wednesday', label: 'Quarta' },
+  { key: 'thursday', label: 'Quinta' },
+  { key: 'friday', label: 'Sexta' },
+  { key: 'saturday', label: 'Sabado' },
+  { key: 'sunday', label: 'Domingo' },
+] as const;
+
+const SLOT_OPTIONS = [30, 45, 60, 90];
+
+const DEFAULT_BUSINESS_HOURS: BusinessHours = {
+  timezone: 'America/Sao_Paulo',
+  days: {
+    monday: [{ start: '09:00', end: '18:00' }],
+    tuesday: [{ start: '09:00', end: '18:00' }],
+    wednesday: [{ start: '09:00', end: '18:00' }],
+    thursday: [{ start: '09:00', end: '18:00' }],
+    friday: [{ start: '09:00', end: '18:00' }],
+  },
+};
+
+function cloneBusinessHours(source?: BusinessHours | null): BusinessHours {
+  const origin = source?.days ? source : DEFAULT_BUSINESS_HOURS;
+
+  return {
+    timezone: origin.timezone || 'America/Sao_Paulo',
+    days: Object.fromEntries(
+      Object.entries(origin.days || {}).map(([day, windows]) => [
+        day,
+        Array.isArray(windows)
+          ? windows.map((window) => ({
+            start: window.start || '09:00',
+            end: window.end || '18:00',
+          }))
+          : [],
+      ]),
+    ),
+  };
+}
+
+function getInitialStep(editMode?: boolean): ModalStep {
+  return editMode ? 2 : 1;
 }
 
 export default function ConnectionModal({
@@ -36,12 +106,18 @@ export default function ConnectionModal({
   onUpdate,
   onCancelConnection,
 }: ConnectionModalProps) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(editMode ? 2 : 1);
+  const [step, setStep] = useState<ModalStep>(getInitialStep(editMode));
   const [useQR, setUseQR] = useState(true);
   const [nome, setNome] = useState(connection?.nome || '');
   const [numero, setNumero] = useState(connection?.numero || '');
   const [agenteId, setAgenteId] = useState(connection?.agente_id || '');
   const [conhecimentoId, setConhecimentoId] = useState(connection?.conhecimento_id || '');
+  const [appointmentSlotMinutes, setAppointmentSlotMinutes] = useState(
+    connection?.appointment_slot_minutes || 60,
+  );
+  const [businessHours, setBusinessHours] = useState<BusinessHours>(
+    cloneBusinessHours(connection?.business_hours),
+  );
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(null);
@@ -49,27 +125,31 @@ export default function ConnectionModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Reset all state when modal opens/closes
   useEffect(() => {
-    if (isOpen) {
-      setStep(editMode ? 2 : 1);
-      setUseQR(true);
-      setNome(connection?.nome || '');
-      setNumero(connection?.numero || '');
-      setAgenteId(connection?.agente_id || '');
-      setConhecimentoId(connection?.conhecimento_id || '');
-      setQrCode(null);
-      setPairingCode(null);
-      setPendingConnectionId(null);
-      setIsConnected(false);
-      setIsLoading(false);
-      setError('');
+    if (!isOpen) {
+      return;
     }
-  }, [isOpen, editMode, connection]);
 
-  // Realtime: escuta mudança de status da conexão pendente
+    setStep(getInitialStep(editMode));
+    setUseQR(true);
+    setNome(connection?.nome || '');
+    setNumero(connection?.numero || '');
+    setAgenteId(connection?.agente_id || '');
+    setConhecimentoId(connection?.conhecimento_id || '');
+    setAppointmentSlotMinutes(connection?.appointment_slot_minutes || 60);
+    setBusinessHours(cloneBusinessHours(connection?.business_hours));
+    setQrCode(null);
+    setPairingCode(null);
+    setPendingConnectionId(null);
+    setIsConnected(false);
+    setIsLoading(false);
+    setError('');
+  }, [connection, editMode, isOpen]);
+
   useEffect(() => {
-    if (!pendingConnectionId || step !== 5) return;
+    if (!pendingConnectionId || step !== 6) {
+      return;
+    }
 
     const channel = supabase
       .channel(`modal-connection-${pendingConnectionId}`)
@@ -81,12 +161,12 @@ export default function ConnectionModal({
           table: 'whatsapp_connections',
         },
         (payload) => {
-          const updated = payload.new as any;
-          if (updated.id === pendingConnectionId && updated.status === 'connected') {
+          const updated = payload.new as { id?: string; status?: string } | null;
+          if (updated?.id === pendingConnectionId && updated.status === 'connected') {
             setIsConnected(true);
-            setStep(6); // Step de sucesso
+            setStep(7);
           }
-        }
+        },
       )
       .subscribe();
 
@@ -95,309 +175,496 @@ export default function ConnectionModal({
     };
   }, [pendingConnectionId, step]);
 
-  if (!isOpen) return null;
+  const stepMeta = useMemo(() => {
+    if (step === 7) {
+      return {
+        description: 'A conexao ja esta pronta para receber mensagens e automacoes.',
+        title: 'Conectado!',
+      };
+    }
+
+    if (step === 6) {
+      return {
+        description: 'Finalize o pareamento no WhatsApp para ativar esta conexao.',
+        title: 'Conecte seu WhatsApp',
+      };
+    }
+
+    if (step === 5) {
+      return {
+        description: 'Configure quando a IA pode oferecer horarios e qual duracao usar em cada encaixe.',
+        title: 'Agenda automatica',
+      };
+    }
+
+    if (editMode) {
+      return {
+        description: 'Revise os dados desta conexao e ajuste o comportamento da automacao.',
+        title: 'Editar Conexao',
+      };
+    }
+
+    if (step === 1) {
+      return {
+        description: 'Escolha como deseja vincular esta nova conexao do WhatsApp.',
+        title: 'Nova Conexao',
+      };
+    }
+
+    return {
+      description: 'Complete os proximos passos para conectar e preparar o atendimento.',
+      title: 'Configurar Conexao',
+    };
+  }, [editMode, step]);
+
+  const visibleSteps = editMode ? [2, 3, 4, 5] : [1, 2, 3, 4, 5];
+  const businessDaysConfigured = WEEKDAY_OPTIONS.filter(
+    (day) => (businessHours.days?.[day.key] || []).length > 0,
+  ).length;
+
+  if (!isOpen) {
+    return null;
+  }
 
   const handleChooseMethod = (method: 'qr' | 'code') => {
     setUseQR(method === 'qr');
+    setError('');
     setStep(2);
   };
 
-  const handleClose = async () => {
-    // Se está no step 5 (aguardando conexão) e NÃO conectou, deletar a conexão fantasma
-    if (step === 5 && pendingConnectionId && !isConnected) {
-      try {
-        await onCancelConnection(pendingConnectionId);
-      } catch {
-        // Silently fail — modal closes anyway
-      }
-    }
-
-    // Reset completo
-    setStep(1);
+  const resetLocalState = () => {
+    setStep(getInitialStep(editMode));
     setUseQR(true);
     setNome('');
     setNumero('');
     setAgenteId('');
     setConhecimentoId('');
+    setAppointmentSlotMinutes(60);
+    setBusinessHours(cloneBusinessHours());
     setQrCode(null);
     setPairingCode(null);
     setPendingConnectionId(null);
     setIsConnected(false);
     setIsLoading(false);
     setError('');
+  };
+
+  const handleClose = async () => {
+    if (step === 6 && pendingConnectionId && !isConnected) {
+      try {
+        await onCancelConnection(pendingConnectionId);
+      } catch {
+        // Mantemos o fechamento mesmo se a limpeza falhar.
+      }
+    }
+
+    resetLocalState();
     onClose();
   };
 
-  const handleFormSubmit = async () => {
-    if (!nome.trim()) {
-      setError('Informe o nome da conexão');
+  const handleBack = () => {
+    setError('');
+
+    if (editMode) {
+      if (step <= 2) {
+        void handleClose();
+        return;
+      }
+
+      setStep((current) => (current > 2 ? ((current - 1) as ModalStep) : current));
       return;
     }
 
-    if (!useQR && !numero.trim()) {
-      setError('Informe o número do WhatsApp para pareamento');
+    if (step <= 1) {
+      void handleClose();
       return;
+    }
+
+    setStep((current) => ((current - 1) as ModalStep));
+  };
+
+  const validateIdentificationStep = () => {
+    if (!nome.trim()) {
+      setError('Informe o nome da conexao.');
+      return false;
+    }
+
+    if (!editMode && !useQR && !numero.trim()) {
+      setError('Informe o numero do WhatsApp para pareamento.');
+      return false;
     }
 
     setError('');
+    return true;
+  };
+
+  const updateDayWindow = (dayKey: string, field: 'start' | 'end', value: string) => {
+    setBusinessHours((current) => {
+      const currentDay = current.days?.[dayKey]?.[0] || { start: '09:00', end: '18:00' };
+      return {
+        ...current,
+        days: {
+          ...(current.days || {}),
+          [dayKey]: [{ ...currentDay, [field]: value }],
+        },
+      };
+    });
+  };
+
+  const toggleBusinessDay = (dayKey: string) => {
+    setBusinessHours((current) => {
+      const enabled = (current.days?.[dayKey] || []).length > 0;
+      const currentDay = current.days?.[dayKey]?.[0] || { start: '09:00', end: '18:00' };
+
+      return {
+        ...current,
+        days: {
+          ...(current.days || {}),
+          [dayKey]: enabled ? [] : [currentDay],
+        },
+      };
+    });
+  };
+
+  const handleAdvanceFromIdentification = () => {
+    if (!validateIdentificationStep()) {
+      return;
+    }
+
+    setStep(3);
+  };
+
+  const handleFormSubmit = async () => {
+    if (!validateIdentificationStep()) {
+      setStep(2);
+      return;
+    }
+
     setIsLoading(true);
+    setError('');
 
     try {
       if (editMode && connection) {
         await onUpdate(connection.id, {
-          nome,
+          nome: nome.trim(),
           agente_id: agenteId || undefined,
           conhecimento_id: conhecimentoId || undefined,
+          business_hours: businessHours,
+          appointment_slot_minutes: appointmentSlotMinutes,
         });
-        handleClose();
-      } else {
-        const result = await onSubmit({
-          nome,
-          numero: !useQR ? numero : undefined,
-          agente_id: agenteId || undefined,
-          conhecimento_id: conhecimentoId || undefined,
-          useQR,
-        });
+        await handleClose();
+        return;
+      }
 
-        if (result) {
-          setQrCode(result.qrCode || null);
-          setPairingCode(result.pairingCode || null);
-          setPendingConnectionId(result.connectionId || null);
-          setStep(5);
-        }
+      const result = await onSubmit({
+        nome: nome.trim(),
+        numero: !useQR ? numero.trim() : undefined,
+        agente_id: agenteId || undefined,
+        conhecimento_id: conhecimentoId || undefined,
+        business_hours: businessHours,
+        appointment_slot_minutes: appointmentSlotMinutes,
+        useQR,
+      });
+
+      if (result) {
+        setQrCode(result.qrCode || null);
+        setPairingCode(result.pairingCode || null);
+        setPendingConnectionId(result.connectionId || null);
+        setStep(6);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao processar conexão');
+      setError(err instanceof Error ? err.message : 'Erro ao processar conexao.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={styles.modalBackdrop} onClick={handleClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.modalBackdrop} onClick={() => void handleClose()}>
+      <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>
-            {step === 6
-              ? 'Conectado!'
-              : editMode
-                ? 'Editar Conexão'
-                : step === 5
-                  ? 'Conecte seu WhatsApp'
-                  : step === 1 ? 'Nova Conexão' : 'Configurar Conexão'}
-          </h2>
-          <button className={styles.modalCloseBtn} onClick={handleClose}>
+          <div className={styles.modalTitleBlock}>
+            <h2 className={styles.modalTitle}>{stepMeta.title}</h2>
+            <p className={styles.modalSubtitle}>{stepMeta.description}</p>
+          </div>
+          <button className={styles.modalCloseBtn} onClick={() => void handleClose()}>
             <X size={20} />
           </button>
         </div>
 
-        {/* Step 1 — Escolha do método */}
+        {step <= 5 && (
+          <div className={styles.modalProgress}>
+            {visibleSteps.map((progressStep) => {
+              const active = progressStep === step;
+              const completed = progressStep < step;
+
+              return (
+                <div
+                  key={progressStep}
+                  className={`${styles.progressDot} ${active ? styles.progressDotActive : ''} ${completed ? styles.progressDotCompleted : ''}`}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {step === 1 && (
           <div className={styles.stepChoices}>
-            <div className={styles.choiceCard} onClick={() => handleChooseMethod('qr')}>
+            <button
+              type="button"
+              className={styles.choiceCard}
+              onClick={() => handleChooseMethod('qr')}
+            >
               <div className={styles.choiceIcon}>
                 <QrCode size={24} color="#fff" />
               </div>
               <div className={styles.choiceContent}>
                 <h3>Conectar via QR Code</h3>
-                <p>Escaneie o código QR com seu WhatsApp</p>
+                <p>Escaneie o QR diretamente no WhatsApp do estabelecimento.</p>
               </div>
-            </div>
+            </button>
 
-            <div className={styles.choiceCard} onClick={() => handleChooseMethod('code')}>
+            <button
+              type="button"
+              className={styles.choiceCard}
+              onClick={() => handleChooseMethod('code')}
+            >
               <div className={styles.choiceIcon}>
                 <Smartphone size={24} color="#fff" />
               </div>
               <div className={styles.choiceContent}>
-                <h3>Conectar via Código</h3>
-                <p>Insira o número e receba um código de pareamento</p>
+                <h3>Conectar via codigo</h3>
+                <p>Informe o numero e use um codigo de pareamento mais rapido.</p>
               </div>
-            </div>
+            </button>
           </div>
         )}
 
-        {/* Step 2 — Identificação */}
         {step === 2 && (
           <>
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Nome da Conexão</label>
+              <label className={styles.formLabel}>Nome da conexao</label>
               <input
                 className={styles.formInput}
                 type="text"
                 placeholder="Ex: WhatsApp Vendas"
                 value={nome}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(event) => setNome(event.target.value)}
               />
             </div>
 
             {!editMode && !useQR && (
               <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Número do WhatsApp</label>
+                <label className={styles.formLabel}>Numero do WhatsApp</label>
                 <input
                   className={styles.formInput}
                   type="text"
                   placeholder="Ex: 5511999999999"
                   value={numero}
-                  onChange={(e) => setNumero(e.target.value)}
+                  onChange={(event) => setNumero(event.target.value)}
                   inputMode="numeric"
                 />
                 <span className={styles.formHint}>
-                  Código do país + DDD + número (sem espaços ou traços)
+                  Use codigo do pais + DDD + numero, sem espacos ou tracos.
                 </span>
               </div>
             )}
 
             {error && <p className={styles.formError}>{error}</p>}
 
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button className={styles.cancelBtn} onClick={() => setStep(1)}>
-                Voltar
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={handleBack}>
+                {editMode ? 'Cancelar' : 'Voltar'}
               </button>
-              <button
-                className={styles.submitBtn}
-                style={{ marginTop: 0 }}
-                onClick={() => {
-                  if (!nome.trim()) {
-                    setError('Informe o nome da conexão');
-                    return;
-                  }
-                  if (!useQR && !numero.trim()) {
-                    setError('Informe o número do WhatsApp para pareamento');
-                    return;
-                  }
-                  setError('');
-                  setStep(3);
-                }}
-              >
-                Avançar
+              <button className={styles.submitBtn} onClick={handleAdvanceFromIdentification}>
+                Avancar
               </button>
             </div>
           </>
         )}
 
-        {/* Step 3 — Agente IA */}
         {step === 3 && (
           <>
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Atribuir Agente IA (opcional)</label>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: -4, marginBottom: 12, textWrap: 'balance' }}>
-                Opcionalmente, associe um agente para dar direcionamento nas respostas nesta conexão.
+              <label className={styles.formLabel}>Agente IA</label>
+              <p className={styles.stepHelper}>
+                Vincule um agente para dar direcionamento ao atendimento desta conexao.
               </p>
               <SearchablePicker
                 value={agenteId}
                 onChange={setAgenteId}
                 placeholder="Buscar agente..."
-                options={agentes.map((a) => ({
-                  id: a.id,
-                  title: a.nome,
-                  subtitle: a.descricao || 'Agente de IA',
+                options={agentes.map((agente) => ({
+                  id: agente.id,
+                  title: agente.nome,
+                  subtitle: agente.descricao || 'Agente de IA',
                 }))}
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button className={styles.cancelBtn} onClick={() => setStep(2)}>
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={handleBack}>
                 Voltar
               </button>
-              <button
-                className={styles.submitBtn}
-                style={{ marginTop: 0 }}
-                onClick={() => setStep(4)}
-              >
-                Avançar
+              <button className={styles.submitBtn} onClick={() => setStep(4)}>
+                Avancar
               </button>
             </div>
           </>
         )}
 
-        {/* Step 4 — Base de Conhecimento */}
         {step === 4 && (
           <>
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Base de Conhecimento (opcional)</label>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: -4, marginBottom: 12, textWrap: 'balance' }}>
-                Opcionalmente, associe uma base de conhecimento para que o agente tenha contexto sobre o seu negócio.
+              <label className={styles.formLabel}>Base de conhecimento</label>
+              <p className={styles.stepHelper}>
+                Adicione a base usada pela IA para responder e detectar gatilhos do negocio.
               </p>
               <SearchablePicker
                 value={conhecimentoId}
                 onChange={setConhecimentoId}
                 placeholder="Buscar base de conhecimento..."
-                options={conhecimentos.map((c) => ({
-                  id: c.id,
-                  title: c.titulo,
+                options={conhecimentos.map((conhecimento) => ({
+                  id: conhecimento.id,
+                  title: conhecimento.titulo,
                 }))}
               />
             </div>
 
             {error && <p className={styles.formError}>{error}</p>}
 
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button className={styles.cancelBtn} onClick={() => setStep(3)} disabled={isLoading}>
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={handleBack} disabled={isLoading}>
                 Voltar
               </button>
-              <button
-                className={styles.submitBtn}
-                style={{ marginTop: 0 }}
-                onClick={handleFormSubmit}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processando...' : editMode ? 'Salvar Alterações' : 'Gerar Conexão'}
+              <button className={styles.submitBtn} onClick={() => setStep(5)} disabled={isLoading}>
+                Avancar
               </button>
             </div>
           </>
         )}
 
-        {/* Step 5 — QR Code ou Pairing Code */}
         {step === 5 && (
+          <>
+            <div className={styles.scheduleSummary}>
+              <div className={styles.scheduleSummaryItem}>
+                <span className={styles.scheduleSummaryLabel}>Dias ativos</span>
+                <strong>{businessDaysConfigured}</strong>
+              </div>
+              <div className={styles.scheduleSummaryItem}>
+                <span className={styles.scheduleSummaryLabel}>Slots</span>
+                <strong>{appointmentSlotMinutes} min</strong>
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Horario aberto do estabelecimento</label>
+              <p className={styles.stepHelper}>
+                A IA vai cruzar esses horarios com os agendamentos ocupados antes de oferecer opcoes ao cliente.
+              </p>
+
+              <div className={styles.businessHoursGrid}>
+                {WEEKDAY_OPTIONS.map((day) => {
+                  const enabled = (businessHours.days?.[day.key] || []).length > 0;
+                  const currentDay = businessHours.days?.[day.key]?.[0] || {
+                    start: '09:00',
+                    end: '18:00',
+                  };
+
+                  return (
+                    <div key={day.key} className={styles.businessDayRow}>
+                      <button
+                        type="button"
+                        className={`${styles.businessDayToggle} ${enabled ? styles.businessDayToggleActive : ''}`}
+                        onClick={() => toggleBusinessDay(day.key)}
+                      >
+                        {day.label}
+                      </button>
+
+                      <div className={styles.businessTimeFields}>
+                        <input
+                          className={styles.formInput}
+                          type="time"
+                          disabled={!enabled}
+                          value={currentDay.start}
+                          onChange={(event) => updateDayWindow(day.key, 'start', event.target.value)}
+                        />
+                        <span className={styles.businessTimeSeparator}>as</span>
+                        <input
+                          className={styles.formInput}
+                          type="time"
+                          disabled={!enabled}
+                          value={currentDay.end}
+                          onChange={(event) => updateDayWindow(day.key, 'end', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Duracao padrao dos slots</label>
+              <div className={styles.slotOptions}>
+                {SLOT_OPTIONS.map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    className={`${styles.slotChip} ${appointmentSlotMinutes === minutes ? styles.slotChipActive : ''}`}
+                    onClick={() => setAppointmentSlotMinutes(minutes)}
+                  >
+                    {minutes} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {error && <p className={styles.formError}>{error}</p>}
+
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={handleBack} disabled={isLoading}>
+                Voltar
+              </button>
+              <button className={styles.submitBtn} onClick={handleFormSubmit} disabled={isLoading}>
+                {isLoading ? 'Processando...' : editMode ? 'Salvar alteracoes' : 'Gerar conexao'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 6 && (
           <div className={styles.qrContainer}>
-            {qrCode && (
-              <>
-                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, textAlign: 'center' }}>
-                  Abra o WhatsApp → Configurações → Dispositivos vinculados → Vincular dispositivo
-                </p>
-                <img src={qrCode} alt="QR Code" className={styles.qrImage} />
-              </>
-            )}
+            <p className={styles.qrInstructions}>
+              Abra o WhatsApp, entre em dispositivos vinculados e confirme este pareamento.
+            </p>
+
+            {qrCode && <img src={qrCode} alt="QR Code" className={styles.qrImage} />}
 
             {pairingCode && (
               <div className={styles.pairingCodeBox}>
-                <p>Insira este código de pareamento no seu WhatsApp:</p>
+                <p>Insira este codigo de pareamento no seu WhatsApp:</p>
                 <span className={styles.pairingCodeValue}>{pairingCode}</span>
               </div>
             )}
 
             <p className={styles.waitingText}>
               <span className={styles.spinner} />
-              Aguardando conexão... A tela será atualizada automaticamente.
+              Aguardando conexao. Esta tela sera atualizada automaticamente.
             </p>
           </div>
         )}
 
-        {/* Step 6 — Sucesso */}
-        {step === 6 && (
+        {step === 7 && (
           <div className={styles.qrContainer}>
-            <div style={{
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: 'rgba(34, 197, 94, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <div className={styles.successBadge}>
               <CheckCircle size={40} color="#4ade80" />
             </div>
-            <h3 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: '8px 0 4px' }}>
-              WhatsApp conectado com sucesso!
-            </h3>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' }}>
-              Sua conexão <strong style={{ color: '#fff' }}>{nome}</strong> está pronta para uso.
+            <h3 className={styles.successTitle}>WhatsApp conectado com sucesso</h3>
+            <p className={styles.successText}>
+              Sua conexao <strong>{nome}</strong> esta pronta para uso.
             </p>
-            <button
-              className={styles.submitBtn}
-              onClick={handleClose}
-              style={{ marginTop: 16 }}
-            >
+            <button className={styles.submitBtn} onClick={() => void handleClose()}>
               Fechar
             </button>
           </div>

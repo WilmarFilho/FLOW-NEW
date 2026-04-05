@@ -1,9 +1,24 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EvolutionApiService } from './evolution-api.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import { UpdateWhatsappDto } from './dto/update-whatsapp.dto';
 import { LogsService } from '../logs/logs.service';
+import { ConversasService } from '../conversas/conversas.service';
+
+export type WhatsappConnectionRecord = {
+  id?: string;
+  nome?: string;
+  numero?: string;
+  status?: string;
+  instance_name?: string;
+  agente_id?: string | null;
+  conhecimento_id?: string | null;
+  business_hours?: unknown;
+  appointment_slot_minutes?: number;
+  ultima_atualizacao?: string;
+  [key: string]: unknown;
+};
 
 @Injectable()
 export class WhatsappService {
@@ -13,6 +28,8 @@ export class WhatsappService {
     private readonly supabaseService: SupabaseService,
     private readonly evolutionApi: EvolutionApiService,
     private readonly logsService: LogsService,
+    @Inject(forwardRef(() => ConversasService))
+    private readonly conversasService: ConversasService,
   ) { }
 
   /**
@@ -69,6 +86,11 @@ export class WhatsappService {
         instance_name: instanceName,
         agente_id: dto.agente_id || null,
         conhecimento_id: dto.conhecimento_id || null,
+        business_hours: dto.business_hours || {
+          timezone: 'America/Sao_Paulo',
+          days: {},
+        },
+        appointment_slot_minutes: dto.appointment_slot_minutes || 60,
       };
 
       // Se a Evolution retornou um ID, usamos ele para manter sincronizado
@@ -123,13 +145,21 @@ export class WhatsappService {
   /**
    * Edita uma conexão existente (nome, agente, conhecimento)
    */
-  async updateConnection(id: string, userId: string, dto: UpdateWhatsappDto) {
+  async updateConnection(
+    id: string,
+    userId: string,
+    dto: UpdateWhatsappDto,
+  ): Promise<WhatsappConnectionRecord> {
     const updateData: Record<string, any> = {
       ultima_atualizacao: new Date().toISOString(),
     };
     if (dto.nome !== undefined) updateData.nome = dto.nome;
     if (dto.agente_id !== undefined) updateData.agente_id = dto.agente_id || null;
     if (dto.conhecimento_id !== undefined) updateData.conhecimento_id = dto.conhecimento_id || null;
+    if (dto.business_hours !== undefined) updateData.business_hours = dto.business_hours;
+    if (dto.appointment_slot_minutes !== undefined) {
+      updateData.appointment_slot_minutes = dto.appointment_slot_minutes;
+    }
 
     const { data, error } = await this.supabaseService
       .getClient()
@@ -149,7 +179,7 @@ export class WhatsappService {
       throw new NotFoundException('Conexão não encontrada');
     }
 
-    return data;
+    return data as WhatsappConnectionRecord;
   }
 
   /**
@@ -230,6 +260,11 @@ export class WhatsappService {
     this.logger.log(`Webhook received: ${event} for instance ${instanceName}`);
 
     if (!instanceName) return { processed: false };
+    const normalizedEvent = String(event || '').toLowerCase();
+
+    if (normalizedEvent.includes('messages.upsert')) {
+      return this.conversasService.handleWhatsappWebhook(payload);
+    }
 
     // Mapeia eventos da Evolution para nossos status
     let newStatus: string | null = null;
@@ -281,6 +316,8 @@ export class WhatsappService {
       .from('whatsapp_connections')
       .update(updateData)
       .eq('instance_name', instanceName);
+
+    console.log(updateData);
 
     if (error) {
       this.logger.error(`Webhook update failed: ${error.message}`);

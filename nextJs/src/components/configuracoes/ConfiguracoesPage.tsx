@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Save, Shield, Settings, User, UploadCloud, Plug, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Camera, Save, Shield, Settings, User, UploadCloud, Plug, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { apiFetch, apiRequest } from '@/lib/api/client';
@@ -19,7 +19,8 @@ interface InitialData {
   endereco: string;
   numero: string;
   mostra_nome_mensagens: boolean;
-  notificacao_para_entrar_conversa: boolean;
+  agendamento_automatico_ia: boolean;
+  alerta_atendentes_intervencao_ia: boolean;
 }
 
 interface ConfiguracoesPageProps {
@@ -47,12 +48,25 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
   // Sistema State
   const [mostraNomeMensagens, setMostraNomeMensagens] = useState(initialData.mostra_nome_mensagens);
-  const [notificacaoEntrarConversa, setNotificacaoEntrarConversa] = useState(initialData.notificacao_para_entrar_conversa);
+  const [agendamentoAutomaticoIa, setAgendamentoAutomaticoIa] = useState(initialData.agendamento_automatico_ia);
+  const [alertaAtendentesIntervencaoIa, setAlertaAtendentesIntervencaoIa] = useState(initialData.alerta_atendentes_intervencao_ia);
 
   // Integrações State
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null }>({ connected: false, email: null });
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
+  const fetchGoogleStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch('/google/status', { userId: initialData.auth_id });
+      if (res.ok) {
+        const data = await res.json();
+        setGoogleStatus(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [initialData.auth_id]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -67,20 +81,8 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
       setActiveTab('integracoes');
     }
 
-    fetchGoogleStatus();
-  }, [initialData.auth_id]);
-
-  const fetchGoogleStatus = async () => {
-    try {
-      const res = await apiFetch('/google/status', { userId: initialData.auth_id });
-      if (res.ok) {
-        const data = await res.json();
-        setGoogleStatus(data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    void fetchGoogleStatus();
+  }, [fetchGoogleStatus]);
 
   const handleConnectGoogle = async () => {
     setIsLoadingGoogle(true);
@@ -151,7 +153,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
       router.refresh();
       setSenha('');
       toast.success('Perfil atualizado com sucesso!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       toast.error('Erro ao salvar o perfil.');
     } finally {
@@ -184,7 +186,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
       router.refresh();
       toast.success('Foto de perfil atualizada!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       toast.error('Erro ao fazer upload da foto. O bucket avatars existe?');
     } finally {
@@ -407,14 +409,29 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                   </div>
                 </div>
 
+
+
                 <div className={styles.settingItem}>
                   <div className={styles.settingInfo}>
-                    <h4>Aviso automático ao atender</h4>
-                    <p>Envia uma mensagem automática informando que você assumiu o atendimento da conversa.</p>
+                    <h4>Agendamento automático pela IA</h4>
+                    <p>Permite que a IA ofereça horários livres e confirme agendamentos automaticamente nas conversas.</p>
                   </div>
                   <div
-                    className={`${styles.toggleSwitch} ${notificacaoEntrarConversa ? styles.active : ''}`}
-                    onClick={() => setNotificacaoEntrarConversa(!notificacaoEntrarConversa)}
+                    className={`${styles.toggleSwitch} ${agendamentoAutomaticoIa ? styles.active : ''}`}
+                    onClick={() => setAgendamentoAutomaticoIa(!agendamentoAutomaticoIa)}
+                  >
+                    <div className={styles.toggleKnob} />
+                  </div>
+                </div>
+
+                <div className={styles.settingItem}>
+                  <div className={styles.settingInfo}>
+                    <h4>Alertar atendentes quando a IA pedir ajuda</h4>
+                    <p>Envia notificações para os números dos atendentes vinculados à conexão quando houver necessidade de intervenção humana.</p>
+                  </div>
+                  <div
+                    className={`${styles.toggleSwitch} ${alertaAtendentesIntervencaoIa ? styles.active : ''}`}
+                    onClick={() => setAlertaAtendentesIntervencaoIa(!alertaAtendentesIntervencaoIa)}
                   >
                     <div className={styles.toggleKnob} />
                   </div>
@@ -432,7 +449,8 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                         userId: initialData.auth_id,
                         body: {
                           mostra_nome_mensagens: mostraNomeMensagens,
-                          notificacao_para_entrar_conversa: notificacaoEntrarConversa
+                          agendamento_automatico_ia: agendamentoAutomaticoIa,
+                          alerta_atendentes_intervencao_ia: alertaAtendentesIntervencaoIa,
                         },
                       });
 

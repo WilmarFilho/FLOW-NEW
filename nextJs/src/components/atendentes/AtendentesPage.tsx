@@ -22,12 +22,14 @@ import styles from './AtendentesPage.module.css';
 interface AtendenteData {
   id: string;
   created_at: string;
+  numero: string | null;
   whatsapp_ids: string[];
   profile: {
     auth_id: string;
     nome_completo: string;
     foto_perfil: string | null;
     status: boolean;
+    email?: string;
   };
 }
 
@@ -224,16 +226,22 @@ export default function AtendentesPage() {
                       <User color="rgba(255,255,255,0.2)" size={24} />
                     </div>
 
-                    <div className={styles.cardMeta}>
-                      <div className={styles.metaItem}>
-                        <MessageCircle size={14} />
-                        <span className={styles.metaValue}>
-                          {atendente.whatsapp_ids?.length || 0} Conexões vinculadas
-                        </span>
-                      </div>
-                      <div className={styles.metaItem}>
-                        <Calendar size={14} />
-                        <span className={styles.metaValue}>
+                      <div className={styles.cardMeta}>
+                        <div className={styles.metaItem}>
+                          <MessageCircle size={14} />
+                          <span className={styles.metaValue}>
+                            {atendente.whatsapp_ids?.length || 0} Conexões vinculadas
+                          </span>
+                        </div>
+                        <div className={styles.metaItem}>
+                          <User size={14} />
+                          <span className={styles.metaValue}>
+                            {atendente.numero || 'Sem número para alerta'}
+                          </span>
+                        </div>
+                        <div className={styles.metaItem}>
+                          <Calendar size={14} />
+                          <span className={styles.metaValue}>
                           Criado em {new Date(atendente.created_at).toLocaleDateString('pt-BR')}
                         </span>
                       </div>

@@ -43,7 +43,8 @@ export default async function Page() {
     endereco: profile?.endereco || '',
     numero: profile?.numero || '',
     mostra_nome_mensagens: profile?.mostra_nome_mensagens ?? true,
-    notificacao_para_entrar_conversa: profile?.notificacao_para_entrar_conversa ?? true,
+    agendamento_automatico_ia: profile?.agendamento_automatico_ia ?? true,
+    alerta_atendentes_intervencao_ia: profile?.alerta_atendentes_intervencao_ia ?? true,
   };
 
   return <ConfiguracoesPage initialData={userInitialData} />;

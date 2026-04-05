@@ -11,7 +11,15 @@ interface ModalProps {
   onClose: () => void;
   onSuccess: () => void;
   editMode?: boolean;
-  atendente?: any;
+  atendente?: {
+    id: string;
+    numero: string | null;
+    whatsapp_ids: string[];
+    profile?: {
+      email?: string;
+      nome_completo?: string;
+    };
+  } | null;
 }
 
 interface WhatsappConnection {
@@ -28,15 +36,15 @@ const backdropVariants = {
 
 const modalVariants = {
   hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
+  visible: {
+    opacity: 1,
+    scale: 1,
     y: 0,
     transition: { type: 'spring', stiffness: 300, damping: 25 }
   },
-  exit: { 
-    opacity: 0, 
-    scale: 0.95, 
+  exit: {
+    opacity: 0,
+    scale: 0.95,
     y: 20,
     transition: { duration: 0.2 }
   },
@@ -47,6 +55,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
     nome_completo: '',
     email: '',
     password: '',
+    numero: '',
     whatsapp_ids: [] as string[]
   });
   const [whatsappConnections, setWhatsappConnections] = useState<WhatsappConnection[]>([]);
@@ -60,6 +69,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
         nome_completo: atendente.profile?.nome_completo || '',
         email: atendente.profile?.email || '', // Email might be hidden in returning query sometimes
         password: '', // Password is not returned
+        numero: atendente.numero || '',
         whatsapp_ids: atendente.whatsapp_ids || []
       });
     }
@@ -71,7 +81,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      
+
       const response = await apiFetch('/whatsapp', {
         userId: session.user.id,
       });
@@ -107,7 +117,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
 
       const method = editMode ? 'PUT' : 'POST';
       const response = await apiFetch(
-        editMode ? `/atendentes/${atendente.id}` : '/atendentes',
+        editMode ? `/atendentes/${atendente?.id}` : '/atendentes',
         {
           method,
           userId: session.user.id,
@@ -121,8 +131,8 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
       }
 
       onSuccess();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar atendente');
     } finally {
       setLoading(false);
     }
@@ -130,7 +140,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
 
   return (
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         className={styles.modalBackdrop}
         variants={backdropVariants}
         initial="hidden"
@@ -138,7 +148,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
         exit="exit"
         onClick={onClose}
       >
-        <motion.div 
+        <motion.div
           className={styles.modal}
           variants={modalVariants}
           onClick={e => e.stopPropagation()}
@@ -182,7 +192,7 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
                   placeholder="joao@exemplo.com"
                   required
                   disabled={editMode}
-                  value={editMode ? atendente.profile?.email : formData.email}
+                  value={editMode ? atendente?.profile?.email || '' : formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
@@ -209,19 +219,37 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
             </div>
 
             <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Número para alertas</label>
+              <div style={{ position: 'relative' }}>
+                <Phone size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
+                <input
+                  type="text"
+                  className={styles.formInput}
+                  style={{ paddingLeft: 42 }}
+                  placeholder="5511999999999"
+                  value={formData.numero}
+                  onChange={e => setFormData({ ...formData, numero: e.target.value })}
+                />
+              </div>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4, textWrap: 'balance' }}>
+                Este número receberá alertas quando a IA identificar necessidade de intervenção humana.
+              </p>
+            </div>
+
+            <div className={styles.formGroup}>
               <label className={styles.formLabel}>Conexões permitidas</label>
               {fetchingConnections ? (
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Carregando conexões...</p>
               ) : whatsappConnections.length > 0 ? (
                 <div className={styles.connectionsGrid}>
                   {whatsappConnections.map(conn => (
-                    <div 
-                      key={conn.id} 
+                    <div
+                      key={conn.id}
                       className={`${styles.connectionOption} ${formData.whatsapp_ids.includes(conn.id) ? styles.connectionOptionActive : ''}`}
                       onClick={() => toggleWhatsapp(conn.id)}
                     >
-                      <div style={{ 
-                        width: 16, height: 16, borderRadius: 4, 
+                      <div style={{
+                        width: 16, height: 16, borderRadius: 4,
                         border: '1px solid rgba(255,255,255,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: formData.whatsapp_ids.includes(conn.id) ? '#1269f4' : 'transparent',

@@ -1,14 +1,16 @@
-import styles from './Sidebar.module.css';
+import type { Metadata } from 'next';
+import HomePage from '@/components/home/HomePage';
+import styles from '../ProtectedPage.module.css';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Home | FLOW',
+  description: 'Acompanhe o resumo executivo da operação da plataforma.',
 };
 
-export default function HomePage() {
+export default function HomeRoute() {
   return (
-    <div>
-      <h1>Bem-vindo à Home</h1>
-      <p style={{ color: '#aaa', marginTop: '10px' }}>Você está autenticado e o layout base com Sidebar está funcionando!</p>
-    </div>
+    <main className={styles.page}>
+      <HomePage />
+    </main>
   );
 }

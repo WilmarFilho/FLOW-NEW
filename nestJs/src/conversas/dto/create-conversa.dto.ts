@@ -1,6 +1,8 @@
 export class CreateConversaDto {
-  contato_id!: string;
+  contato_id?: string;
   whatsapp_connection_id!: string;
+  contact_name?: string;
+  contact_whatsapp?: string;
 }
 
 export class SendConversaMessageDto {
@@ -10,4 +12,3 @@ export class SendConversaMessageDto {
 export class ToggleConversaAiDto {
   enabled!: boolean;
 }
-

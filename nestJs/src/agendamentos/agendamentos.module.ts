@@ -8,5 +8,6 @@ import { GoogleModule } from '../google/google.module';
   imports: [SupabaseModule, GoogleModule],
   controllers: [AgendamentosController],
   providers: [AgendamentosService],
+  exports: [AgendamentosService],
 })
 export class AgendamentosModule {}

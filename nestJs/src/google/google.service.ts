@@ -180,4 +180,45 @@ export class GoogleService {
       return false;
     }
   }
+
+  async listBusyIntervals(
+    profileId: string,
+    timeMin: string,
+    timeMax: string,
+  ) {
+    const supabase = this.supabaseService.getClient();
+
+    const { data: tokenData, error } = await supabase
+      .from('user_integrations')
+      .select('access_token, refresh_token')
+      .eq('profile_id', profileId)
+      .eq('provider', 'google')
+      .single();
+
+    if (error || !tokenData) {
+      return [];
+    }
+
+    this.oauth2Client.setCredentials({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
+
+    try {
+      const response = await calendar.freebusy.query({
+        requestBody: {
+          timeMin,
+          timeMax,
+          items: [{ id: 'primary' }],
+        },
+      });
+
+      return response.data.calendars?.primary?.busy || [];
+    } catch (err: any) {
+      console.error('Falha ao buscar busy do Google Calendar:', err.message);
+      return [];
+    }
+  }
 }

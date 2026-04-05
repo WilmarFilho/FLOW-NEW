@@ -3,6 +3,7 @@ import { WhatsappService } from './whatsapp.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EvolutionApiService } from './evolution-api.service';
 import { LogsService } from '../logs/logs.service';
+import { ConversasService } from '../conversas/conversas.service';
 
 describe('WhatsappService', () => {
   let service: WhatsappService;
@@ -46,6 +47,12 @@ describe('WhatsappService', () => {
             createLog: jest.fn(),
           },
         },
+        {
+          provide: ConversasService,
+          useValue: {
+            handleWhatsappWebhook: jest.fn().mockResolvedValue({ processed: true }),
+          },
+        },
       ],
     }).compile();
 
@@ -80,7 +87,11 @@ describe('WhatsappService', () => {
     });
 
     expect(result.processed).toBe(true);
-    expect(result.status).toBe('connected');
+    if ('status' in result) {
+      expect(result.status).toBe('connected');
+    } else {
+      fail('Webhook de conexão deveria retornar um status de conexão.');
+    }
   });
 
   it('should return processed false for unknown event', async () => {

@@ -26,6 +26,11 @@ export class ConversasController {
     return this.conversasService.listConversas(userId);
   }
 
+  @Get('options')
+  async getOptions(@CurrentUserId() userId: string) {
+    return this.conversasService.getConversationOptions(userId);
+  }
+
   @Post()
   async createConversa(
     @CurrentUserId() userId: string,
@@ -76,4 +81,3 @@ export class ConversasController {
     return this.conversasService.sendMensagem(userId, conversaId, dto.content);
   }
 }
-

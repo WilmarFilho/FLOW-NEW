@@ -3,5 +3,10 @@ export class CreateWhatsappDto {
   numero?: string;
   agente_id?: string;
   conhecimento_id?: string;
+  business_hours?: {
+    timezone?: string;
+    days?: Record<string, Array<{ start: string; end: string }>>;
+  };
+  appointment_slot_minutes?: number;
   user_id!: string;
 }

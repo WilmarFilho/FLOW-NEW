@@ -1,0 +1,884 @@
+.page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.workspace {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.sidebar,
+.chatPanel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.9rem;
+  background:
+    radial-gradient(circle at top left, rgba(18, 105, 244, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(8, 16, 31, 0.92) 0%, rgba(5, 10, 20, 0.98) 100%);
+  box-shadow: var(--shadow-elevated);
+}
+
+.sidebarTop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebarIntro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.sidebarTitle {
+  display: block;
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.searchField input,
+.field input,
+.composerInput {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  outline: none;
+}
+
+.searchField input::placeholder,
+.field input::placeholder,
+.composerInput::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.filterRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filterLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.filterChip,
+.ghostButton,
+.iconButton,
+.textButton,
+.toggleButton,
+.primaryButton,
+.sendButton,
+.optionCard,
+.contactOption,
+.chatCard {
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease,
+    color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.filterChip {
+  padding: 0.62rem 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.filterChip:hover,
+.ghostButton:hover,
+.textButton:hover,
+.iconButton:hover,
+.toggleButton:hover,
+.optionCard:hover,
+.contactOption:hover,
+.chatCard:hover {
+  transform: translateY(-1px);
+}
+
+.filterChipActive {
+  background: linear-gradient(135deg, #ffe664 0%, var(--color-secondary) 100%);
+  border-color: rgba(242, 228, 22, 0.38);
+  color: var(--color-aux-black);
+}
+
+.chatListWrap,
+.messagesScroller,
+.contactList,
+.modalBody {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chatListWrap::-webkit-scrollbar,
+.messagesScroller::-webkit-scrollbar,
+.contactList::-webkit-scrollbar,
+.modalBody::-webkit-scrollbar {
+  display: none;
+}
+
+.chatList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0 0.9rem 0.95rem;
+}
+
+.chatCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.chatCardActive {
+  border-color: rgba(18, 105, 244, 0.42);
+  background: rgba(18, 105, 244, 0.12);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.16);
+}
+
+.chatAvatar,
+.chatHeaderAvatar,
+.contactAvatar {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(18, 105, 244, 0.28) 0%, rgba(8, 24, 58, 0.9) 100%);
+  color: #fff;
+  font-weight: 800;
+}
+
+.chatAvatar {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+}
+
+.chatAvatarImage {
+  object-fit: cover;
+}
+
+.chatCardBody {
+  min-width: 0;
+}
+
+.chatCardHeader,
+.chatCardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.chatCardHeader strong,
+.contactInfo strong,
+.chatHeaderText strong {
+  display: block;
+  min-width: 0;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.chatCardHeader span,
+.chatCardMeta span,
+.contactInfo span,
+.chatHeaderText span,
+.messageTimestamp {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.chatCardHeader span,
+.chatCardMeta span {
+  font-size: 0.77rem;
+  white-space: nowrap;
+}
+
+.chatCardPreview {
+  margin: 0.38rem 0 0.5rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chatCardBadges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.aiBadge,
+.ownerBadge,
+.unreadBadge,
+.infoPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.aiBadge {
+  background: rgba(34, 197, 94, 0.16);
+  color: #d8ffe9;
+}
+
+.ownerBadge,
+.infoPill {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.unreadBadge {
+  min-width: 1.55rem;
+  justify-content: center;
+  background: var(--color-secondary);
+  color: var(--color-aux-black);
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chatHeaderIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.chatHeaderAvatar {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+}
+
+.chatHeaderText {
+  min-width: 0;
+}
+
+.chatHeaderText strong,
+.contactInfo strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatInfoBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.85rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.noticeCard,
+.emptyPanel,
+.emptyChat,
+.emptyTimeline,
+.centerState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.noticeCard {
+  align-items: flex-start;
+  margin: 1rem 1.2rem 0;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.noticeCard strong,
+.emptyPanel strong,
+.emptyChat strong,
+.emptyTimeline strong {
+  color: #fff;
+  font-size: 0.96rem;
+}
+
+.noticeCard p,
+.emptyPanel p,
+.emptyChat p,
+.emptyTimeline p,
+.centerState span,
+.modalDescription {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.58);
+  text-wrap: balance;
+}
+
+.messagesScroller {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at top, rgba(18, 105, 244, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(4, 10, 22, 0.6) 0%, rgba(5, 10, 20, 0.3) 100%);
+}
+
+.messageGroup {
+  display: flex;
+  max-width: min(38rem, 88%);
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.messageGroupInbound {
+  align-self: flex-start;
+}
+
+.messageGroupOutbound {
+  align-self: flex-end;
+}
+
+.messageGroupSystem {
+  align-self: center;
+  max-width: min(30rem, 92%);
+}
+
+.messageBubble {
+  padding: 0.9rem 1rem;
+  border-radius: 1.2rem;
+}
+
+.messageBubbleInbound {
+  background: rgba(255, 255, 255, 0.08);
+  border-top-left-radius: 0.45rem;
+}
+
+.messageBubbleOutbound {
+  background: linear-gradient(135deg, rgba(18, 105, 244, 0.95) 0%, rgba(8, 54, 138, 0.96) 100%);
+  border-top-right-radius: 0.45rem;
+}
+
+.messageBubbleSystem {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.messageText,
+.messageCaption {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.75;
+  color: #fff;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.messageCaption {
+  margin-top: 0.7rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.messageTimestamp {
+  padding: 0 0.2rem;
+  font-size: 0.72rem;
+}
+
+.mediaWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mediaImage,
+.mediaVideo {
+  display: block;
+  max-width: min(20rem, 100%);
+  border-radius: 1rem;
+}
+
+.audioPlayer {
+  width: min(20rem, 100%);
+}
+
+.audioLabel,
+.unsupportedMedia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 1rem 1.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.composerInput {
+  min-height: 3.3rem;
+  max-height: 10rem;
+  padding: 1rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.04);
+  resize: none;
+  font: inherit;
+}
+
+.primaryButton,
+.ghostButton,
+.toggleButton,
+.sendButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  padding: 0.92rem 1.15rem;
+  background: linear-gradient(135deg, #ffe664 0%, var(--color-secondary) 100%);
+  color: var(--color-aux-black);
+  box-shadow: 0 16px 32px rgba(242, 228, 22, 0.18);
+}
+
+.ghostButton,
+.toggleButton,
+.iconButton {
+  padding: 0.88rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.toggleButtonActive {
+  background: rgba(34, 197, 94, 0.16);
+  color: #d8ffe9;
+}
+
+.sendButton {
+  width: 3.3rem;
+  height: 3.3rem;
+  align-self: end;
+  background: linear-gradient(135deg, rgba(18, 105, 244, 0.95) 0%, rgba(8, 54, 138, 0.96) 100%);
+  color: #fff;
+}
+
+.primaryButton:hover,
+.sendButton:hover {
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled,
+.ghostButton:disabled,
+.toggleButton:disabled,
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mobileBackButton {
+  display: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(4, 8, 15, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.modalShell {
+  display: flex;
+  width: min(56rem, 100%);
+  max-height: min(88vh, 52rem);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.85rem;
+  background:
+    radial-gradient(circle at top left, rgba(18, 105, 244, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(8, 16, 31, 0.98) 0%, rgba(5, 10, 20, 1) 100%);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.42);
+}
+
+.modalHeader,
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.3rem;
+}
+
+.modalHeader {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modalFooter {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  padding: 0 1.3rem 1.3rem;
+}
+
+.modalEyebrow {
+  display: inline-flex;
+  margin-bottom: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #fff;
+}
+
+.modalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.sectionHeader span {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.textButton,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.textButton {
+  padding: 0.72rem 0.95rem;
+  font-size: 0.82rem;
+}
+
+.iconButton {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+.optionGrid,
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.optionCard,
+.contactOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  text-align: left;
+}
+
+.optionCardActive,
+.contactOptionActive {
+  border-color: rgba(242, 228, 22, 0.28);
+  background: rgba(242, 228, 22, 0.1);
+  color: #fff4a8;
+}
+
+.optionCardContent {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.optionCardContent strong {
+  color: inherit;
+}
+
+.optionCardContent span {
+  font-size: 0.83rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.field input {
+  padding: 0.92rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  font: inherit;
+}
+
+.contactList {
+  display: flex;
+  max-height: 18rem;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.contactIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.contactAvatar {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.contactAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.contactInfo {
+  min-width: 0;
+}
+
+.emptyPanel,
+.emptyChat,
+.emptyTimeline,
+.centerState {
+  flex: 1;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-secondary);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.hiddenAssistive {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  }
+
+  .optionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebarHiddenMobile,
+  .chatPanelHiddenMobile {
+    display: none;
+  }
+
+  .mobileBackButton {
+    display: inline-flex;
+  }
+
+  .chatHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chatHeaderActions {
+    width: 100%;
+  }
+
+  .toggleButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .primaryButton {
+    width: 100%;
+  }
+
+  .sidebarIntro {
+    flex-direction: column;
+  }
+
+  .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .sendButton {
+    width: 100%;
+    height: 3rem;
+  }
+
+  .formGrid,
+  .modalFooter {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .ghostButton,
+  .primaryButton {
+    width: 100%;
+  }
+}

@@ -1,0 +1,799 @@
+.page {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: none;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at top left, rgba(18, 105, 244, 0.22), transparent 32%),
+    radial-gradient(circle at right center, rgba(242, 228, 22, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(8, 16, 31, 0.96) 0%, rgba(5, 10, 20, 0.98) 100%);
+  min-height: 11.25rem;
+  padding: 1.75rem;
+  box-shadow: var(--shadow-elevated);
+}
+
+.headerContent {
+  max-width: 48rem;
+}
+
+.headerEyebrow,
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.header h1,
+.chartHeader h2,
+.engineHeader h2 {
+  margin: 0;
+  color: #fff;
+}
+
+.header h1 {
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.header p,
+.chartHeader p,
+.engineHeader p,
+.panel p {
+  margin: 0.9rem 0 0;
+  max-width: 42rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  text-wrap: balance;
+}
+
+.headerControls {
+  display: flex;
+  min-width: min(100%, 18rem);
+  flex-direction: column;
+  gap: 1rem;
+  padding-block: 0.2rem;
+}
+
+.rangePicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+.rangeChip,
+.seriesToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.rangeChip {
+  padding: 0 1rem;
+}
+
+.rangeChip:hover,
+.seriesToggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.rangeChipActive,
+.seriesToggleActive {
+  border-color: rgba(242, 228, 22, 0.2);
+  background: linear-gradient(135deg, #ffe664 0%, var(--color-secondary) 100%);
+  color: var(--color-aux-black);
+  box-shadow: 0 14px 26px rgba(242, 228, 22, 0.16);
+}
+
+.headerMeta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.82rem;
+}
+
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.2rem;
+}
+
+.statCard,
+.chartCard,
+.engineCard,
+.panel {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.8rem;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 30%),
+    linear-gradient(180deg, rgba(8, 16, 31, 0.94) 0%, rgba(5, 10, 20, 0.98) 100%);
+  box-shadow: var(--shadow-elevated);
+}
+
+.statCard {
+  position: relative;
+  display: flex;
+  min-height: 10.5rem;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  padding: 1.5rem;
+}
+
+.statCard::after {
+  content: '';
+  position: absolute;
+  inset: auto -10% -36% auto;
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 50%;
+  opacity: 0.8;
+  filter: blur(10px);
+}
+
+.statCardBlue::after {
+  background: rgba(47, 140, 255, 0.18);
+}
+
+.statCardGold::after {
+  background: rgba(248, 233, 111, 0.18);
+}
+
+.statCardGreen::after {
+  background: rgba(110, 231, 183, 0.18);
+}
+
+.statCardIce::after {
+  background: rgba(155, 216, 255, 0.18);
+}
+
+.statLabel {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statValue {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.statDelta {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.statDeltaUp {
+  background: rgba(34, 197, 94, 0.14);
+  color: #d8ffe9;
+}
+
+.statDeltaDown {
+  background: rgba(239, 68, 68, 0.14);
+  color: #ffd5d5;
+}
+
+.statDeltaFlat {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.primaryGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 0.9fr);
+  gap: 1.25rem;
+}
+
+.chartCard,
+.engineCard,
+.panel {
+  padding: 1.5rem;
+}
+
+.chartHeader,
+.panelHeader,
+.engineHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.2rem;
+}
+
+.chartHeader h2,
+.engineHeader h2,
+.panelHeader h3 {
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.panelHeader h3 {
+  font-size: 1.1rem;
+}
+
+.panelIcon {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.seriesToggleGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+}
+
+.seriesToggle {
+  padding: 0 0.9rem;
+}
+
+.seriesDot {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+}
+
+.chartCanvasWrap {
+  margin-top: 1.5rem;
+}
+
+.chartCanvas {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chartGridLine {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chartArea {
+  opacity: 0.95;
+}
+
+.chartLine {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chartCursor {
+  opacity: 0;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-dasharray: 6 6;
+  transition: opacity 0.2s ease;
+}
+
+.chartCursorVisible {
+  opacity: 1;
+}
+
+.chartPoint {
+  stroke: rgba(8, 16, 31, 0.96);
+  stroke-width: 3;
+}
+
+.chartLabels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(3rem, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.chartLabel {
+  min-height: 2.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.chartLabelActive,
+.chartLabel:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.chartFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chartFooter strong {
+  color: #fff;
+  font-size: 1rem;
+}
+
+.chartFooterLabel {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chartFooterStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.chartFooterStats span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.engineCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.donutWrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-top: 0.3rem;
+}
+
+.donutChart {
+  width: min(100%, 15rem);
+  height: auto;
+}
+
+.donutTrack,
+.donutSegmentActive,
+.donutSegmentArchived,
+.donutSegmentHuman {
+  fill: none;
+  stroke-width: 12;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  stroke-linecap: round;
+}
+
+.donutTrack {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.donutSegmentActive {
+  stroke: #2f8cff;
+}
+
+.donutSegmentArchived {
+  stroke: #f8e96f;
+}
+
+.donutSegmentHuman {
+  stroke: #fb7185;
+}
+
+.donutCenter {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.donutCenter strong {
+  color: #fff;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.donutCenter span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.engineMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.engineMetric,
+.barItem,
+.connectionItem,
+.campaignItem {
+  padding: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.engineMetric span,
+.connectionStats span,
+.campaignDate,
+.campaignProgressLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.8rem;
+}
+
+.engineMetric strong {
+  display: block;
+  margin-top: 0.45rem;
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+.secondaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.barList,
+.connectionList,
+.campaignList {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.barMeta,
+.connectionHead,
+.campaignTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.barMeta strong,
+.connectionHead strong,
+.campaignTop strong {
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.barMeta span,
+.connectionHead span {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.barTrack,
+.campaignProgressTrack {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 0.7rem;
+  margin-top: 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.barFill,
+.campaignProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f8cff 0%, #f8e96f 100%);
+}
+
+.weekList {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+  min-height: 12rem;
+  margin-top: 1.25rem;
+}
+
+.weekItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.weekItem strong {
+  color: #fff;
+  font-size: 0.92rem;
+}
+
+.weekItem span {
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.weekColumns {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.18rem;
+  min-height: 7.4rem;
+}
+
+.weekColumnConfirmed,
+.weekColumnPending,
+.weekColumnCancelled {
+  width: 0.52rem;
+  min-height: 0.38rem;
+  border-radius: 999px;
+}
+
+.weekColumnConfirmed {
+  background: #6ee7b7;
+}
+
+.weekColumnPending {
+  background: #f8e96f;
+}
+
+.weekColumnCancelled {
+  background: #fb7185;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.legendRow span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.legendRow i {
+  display: inline-block;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+}
+
+.legendConfirmed {
+  background: #6ee7b7;
+}
+
+.legendPending {
+  background: #f8e96f;
+}
+
+.legendCancelled {
+  background: #fb7185;
+}
+
+.connectionIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.connectionAccent {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+}
+
+.connectionStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+.connectionStatus {
+  text-transform: capitalize;
+}
+
+.campaignBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.emptyMiniState {
+  display: grid;
+  place-items: center;
+  min-height: 9rem;
+  padding: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 1.2rem;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.loadingState {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at top left, rgba(18, 105, 244, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(8, 16, 31, 0.96) 0%, rgba(5, 10, 20, 0.98) 100%);
+  padding: 2rem;
+  text-align: center;
+}
+
+.loadingState strong {
+  color: #fff;
+  font-size: 1.4rem;
+}
+
+.loadingState span {
+  max-width: 34rem;
+  color: rgba(255, 255, 255, 0.56);
+  line-height: 1.8;
+}
+
+.loadingOrb {
+  width: 4.4rem;
+  height: 4.4rem;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--color-secondary);
+  border-right-color: #2f8cff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .heroStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .primaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .secondaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .engineMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .header,
+  .chartCard,
+  .engineCard,
+  .panel,
+  .statCard {
+    border-radius: 1.5rem;
+  }
+
+  .header {
+    min-height: auto;
+    padding: 1.35rem;
+  }
+
+  .heroStats {
+    grid-template-columns: 1fr;
+  }
+
+  .headerControls,
+  .rangePicker,
+  .seriesToggleGrid {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .rangeChip,
+  .seriesToggle {
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+
+  .engineMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .weekList {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 1rem;
+  }
+}

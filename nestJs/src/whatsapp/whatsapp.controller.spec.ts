@@ -8,12 +8,22 @@ describe('WhatsappController', () => {
 
   beforeEach(async () => {
     mockService = {
-      listConnections: jest.fn().mockResolvedValue([{ id: '1', nome: 'Test Connection' }]),
-      createConnection: jest.fn().mockResolvedValue({ connection: { id: '1' }, qrCode: 'base64', pairingCode: null }),
-      updateConnection: jest.fn().mockResolvedValue({ id: '1', nome: 'Updated' }),
+      listConnections: jest
+        .fn()
+        .mockResolvedValue([{ id: '1', nome: 'Test Connection' }]),
+      createConnection: jest.fn().mockResolvedValue({
+        connection: { id: '1' },
+        qrCode: 'base64',
+        pairingCode: null,
+      }),
+      updateConnection: jest
+        .fn()
+        .mockResolvedValue({ id: '1', nome: 'Updated' }),
       deleteConnection: jest.fn().mockResolvedValue({ deleted: true }),
       sendTestMessage: jest.fn().mockResolvedValue({ success: true }),
-      handleWebhook: jest.fn().mockResolvedValue({ processed: true, status: 'connected' }),
+      handleWebhook: jest
+        .fn()
+        .mockResolvedValue({ processed: true, status: 'connected' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,7 +51,9 @@ describe('WhatsappController', () => {
   });
 
   it('should update a connection', async () => {
-    const result = await controller.updateConnection('conn-1', 'user-1', { nome: 'Updated' });
+    const result = await controller.updateConnection('conn-1', 'user-1', {
+      nome: 'Updated',
+    });
     expect(result.nome).toBe('Updated');
   });
 
@@ -51,7 +63,10 @@ describe('WhatsappController', () => {
   });
 
   it('should send test message', async () => {
-    const result = await controller.sendTestMessage('conn-1', 'user-1', { number: '5511999999999', message: 'Hello' });
+    const result = await controller.sendTestMessage('conn-1', 'user-1', {
+      number: '5511999999999',
+      message: 'Hello',
+    });
     expect(result.success).toBe(true);
   });
 

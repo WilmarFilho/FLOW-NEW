@@ -5,19 +5,23 @@ import { SupabaseService } from '../supabase/supabase.service';
 export class ProfileService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async updateProfile(userId: string, updateData: any) {
+  async updateProfile(userId: string, updateData: Record<string, unknown>) {
     const supabase = this.supabaseService.getClient();
-    
-    // Only allow expected fields
-    const allowedUpdates: any = {};
+
+    const allowedUpdates: Record<string, unknown> = {};
     const fields = [
-      'nome_completo', 'cidade', 'endereco', 'numero', 
-      'mostra_nome_mensagens', 'notificacao_para_entrar_conversa'
+      'nome_completo',
+      'cidade',
+      'endereco',
+      'numero',
+      'mostra_nome_mensagens',
+      'agendamento_automatico_ia',
+      'alerta_atendentes_intervencao_ia',
     ];
-    
-    fields.forEach(f => {
-      if (updateData[f] !== undefined) {
-        allowedUpdates[f] = updateData[f];
+
+    fields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        allowedUpdates[field] = updateData[field];
       }
     });
 
@@ -48,7 +52,9 @@ export class ProfileService {
       });
 
     if (uploadError) {
-      throw new InternalServerErrorException('Failed to upload avatar: ' + uploadError.message);
+      throw new InternalServerErrorException(
+        'Failed to upload avatar: ' + uploadError.message,
+      );
     }
 
     // Get public URL
@@ -62,7 +68,9 @@ export class ProfileService {
       .eq('auth_id', userId);
 
     if (updateError) {
-      throw new InternalServerErrorException('Failed to update profile avatar: ' + updateError.message);
+      throw new InternalServerErrorException(
+        'Failed to update profile avatar: ' + updateError.message,
+      );
     }
 
     return { foto_perfil: publicUrl };

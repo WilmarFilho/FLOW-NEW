@@ -7,11 +7,16 @@ export class EvolutionApiService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly webhookBaseUrl: string;
+  private readonly webhookSecret: string;
 
   constructor(private configService: ConfigService) {
     this.baseUrl = (this.configService.get<string>('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
     this.apiKey = this.configService.get<string>('EVOLUTION_API_KEY') || '';
     this.webhookBaseUrl = (this.configService.get<string>('WEBHOOK_BASE_URL') || '').replace(/\/+$/, '');
+    this.webhookSecret =
+      this.configService.get<string>('WHATSAPP_WEBHOOK_SECRET') ||
+      this.configService.get<string>('EVOLUTION_WEBHOOK_SECRET') ||
+      '';
 
     if (!this.baseUrl || !this.apiKey) {
       this.logger.warn('Evolution API URL ou API Key não configuradas no .env');
@@ -72,6 +77,12 @@ export class EvolutionApiService {
           'QRCODE_UPDATED',
           'MESSAGES_UPSERT',
         ],
+        headers: this.webhookSecret
+          ? {
+              'x-webhook-secret': this.webhookSecret,
+              Authorization: `Bearer ${this.webhookSecret}`,
+            }
+          : undefined,
       },
     };
 

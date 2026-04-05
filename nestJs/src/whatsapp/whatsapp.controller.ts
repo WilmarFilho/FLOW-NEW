@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
+import type { WhatsappConnectionRecord } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import { UpdateWhatsappDto } from './dto/update-whatsapp.dto';
 import { TestMessageDto } from './dto/test-message.dto';
@@ -54,7 +55,7 @@ export class WhatsappController {
     @Param('id') id: string,
     @CurrentUserId() userId: string,
     @Body() dto: UpdateWhatsappDto,
-  ) {
+  ): Promise<WhatsappConnectionRecord> {
     return this.whatsappService.updateConnection(id, userId, dto);
   }
 
@@ -82,7 +83,12 @@ export class WhatsappController {
     @CurrentUserId() userId: string,
     @Body() dto: TestMessageDto,
   ) {
-    return this.whatsappService.sendTestMessage(id, userId, dto.number, dto.message);
+    return this.whatsappService.sendTestMessage(
+      id,
+      userId,
+      dto.number,
+      dto.message,
+    );
   }
 
   /**

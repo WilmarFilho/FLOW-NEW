@@ -197,6 +197,11 @@ export default function WhatsappPage() {
       numero?: string;
       agente_id?: string;
       conhecimento_id?: string;
+      business_hours?: {
+        timezone?: string;
+        days?: Record<string, Array<{ start: string; end: string }>>;
+      };
+      appointment_slot_minutes?: number;
       useQR: boolean;
     }) => {
       const result = await apiRequest<{ connection?: { id?: string | null } }>('/whatsapp', {
@@ -207,6 +212,8 @@ export default function WhatsappPage() {
           numero: data.numero,
           agente_id: data.agente_id,
           conhecimento_id: data.conhecimento_id,
+          business_hours: data.business_hours,
+          appointment_slot_minutes: data.appointment_slot_minutes,
         },
       });
       // Revalidate connections after create
@@ -221,7 +228,19 @@ export default function WhatsappPage() {
 
   // Update connection
   const handleUpdate = useCallback(
-    async (id: string, data: { nome?: string; agente_id?: string; conhecimento_id?: string }) => {
+    async (
+      id: string,
+      data: {
+        nome?: string;
+        agente_id?: string;
+        conhecimento_id?: string;
+        business_hours?: {
+          timezone?: string;
+          days?: Record<string, Array<{ start: string; end: string }>>;
+        };
+        appointment_slot_minutes?: number;
+      },
+    ) => {
       const updated = await apiRequest<Partial<WhatsappConnection>>(`/whatsapp/${id}`, {
         method: 'PUT',
         userId,

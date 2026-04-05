@@ -342,11 +342,25 @@
   margin-bottom: 28px;
 }
 
+.modalTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .modalTitle {
   font-size: 22px;
   font-weight: 700;
   color: #fff;
   margin: 0;
+}
+
+.modalSubtitle {
+  margin: 0;
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .modalCloseBtn {
@@ -362,6 +376,29 @@
 .modalCloseBtn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+
+.modalProgress {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.progressDot {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.progressDotActive {
+  background: rgba(18, 105, 244, 0.9);
+  transform: scaleY(1.2);
+}
+
+.progressDotCompleted {
+  background: rgba(242, 228, 22, 0.7);
 }
 
 /* Step Choice Cards */
@@ -381,6 +418,8 @@
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: all 0.25s ease;
+  width: 100%;
+  text-align: left;
 }
 
 .choiceCard:hover {
@@ -475,6 +514,151 @@
   margin-top: 6px;
 }
 
+.stepHelper {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.scheduleSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.scheduleSummaryItem {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.scheduleSummaryItem strong {
+  display: block;
+  margin-top: 4px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.scheduleSummaryLabel {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.businessHoursGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.businessDayRow {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.businessDayToggle {
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.businessDayToggle:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.businessDayToggleActive {
+  border-color: rgba(242, 228, 22, 0.24);
+  background: rgba(242, 228, 22, 0.08);
+  color: var(--color-secondary);
+}
+
+.businessTimeFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.timeFieldCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timeFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.timeFieldInput {
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.businessTimeSeparator {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.slotOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.slotChip {
+  min-width: 92px;
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slotChip:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.slotChipActive {
+  border-color: rgba(18, 105, 244, 0.28);
+  background: rgba(18, 105, 244, 0.1);
+  color: #fff;
+}
+
 /* Custom Picker */
 .pickerContainer {
   display: flex;
@@ -527,6 +711,7 @@
 .pickerList::-webkit-scrollbar {
   width: 4px;
 }
+
 .pickerList::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
@@ -607,6 +792,15 @@
   align-items: center;
   gap: 20px;
   padding: 20px;
+}
+
+.qrInstructions {
+  margin: 0;
+  max-width: 320px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .qrImage {
@@ -733,6 +927,36 @@
 
 .cancelBtn:hover {
   background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.successBadge {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.successTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.successText {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.successText strong {
   color: #fff;
 }
 
@@ -1087,6 +1311,22 @@
   .modal {
     padding: 24px;
     margin: 10px;
+  }
+
+  .scheduleSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .businessDayRow {
+    grid-template-columns: 1fr;
+  }
+
+  .businessTimeFields {
+    grid-template-columns: 1fr;
+  }
+
+  .businessTimeSeparator {
+    display: none;
   }
 }
 
