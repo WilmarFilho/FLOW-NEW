@@ -12,6 +12,8 @@ import { AtendentesModule } from './atendentes/atendentes.module';
 import { HelpModule } from './help/help.module';
 import { AgentesIaModule } from './agentes-ia/agentes-ia.module';
 import { ProfileModule } from './profile/profile.module';
+import { AgendamentosModule } from './agendamentos/agendamentos.module';
+import { GoogleModule } from './google/google.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { ProfileModule } from './profile/profile.module';
     HelpModule,
     AgentesIaModule,
     ProfileModule,
+    AgendamentosModule,
+    GoogleModule,
   ],
   controllers: [AppController],
   providers: [
