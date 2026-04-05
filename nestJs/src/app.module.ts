@@ -14,6 +14,7 @@ import { AgentesIaModule } from './agentes-ia/agentes-ia.module';
 import { ProfileModule } from './profile/profile.module';
 import { AgendamentosModule } from './agendamentos/agendamentos.module';
 import { GoogleModule } from './google/google.module';
+import { CampanhasModule } from './campanhas/campanhas.module';
 
 import { ContatosModule } from './contatos/contatos.module';
 
@@ -31,6 +32,7 @@ import { ContatosModule } from './contatos/contatos.module';
     AgendamentosModule,
     GoogleModule,
     ContatosModule,
+    CampanhasModule,
   ],
   controllers: [AppController],
   providers: [

@@ -8,6 +8,6 @@ import { LogsModule } from '../logs/logs.module';
   imports: [LogsModule],
   controllers: [WhatsappController],
   providers: [WhatsappService, EvolutionApiService],
-  exports: [WhatsappService],
+  exports: [WhatsappService, EvolutionApiService],
 })
 export class WhatsappModule {}
