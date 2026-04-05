@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, User, Mail, Lock, Phone, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch } from '@/lib/api/client';
 import styles from './AtendentesPage.module.css';
 
 interface ModalProps {
@@ -71,9 +72,8 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${NEXT_PUBLIC_API_URL}/whatsapp`, {
-        headers: { 'x-user-id': session.user.id }
+      const response = await apiFetch('/whatsapp', {
+        userId: session.user.id,
       });
 
       if (response.ok) {
@@ -105,21 +105,15 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
 
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const url = editMode 
-        ? `${NEXT_PUBLIC_API_URL}/atendentes/${atendente.id}` 
-        : `${NEXT_PUBLIC_API_URL}/atendentes`;
-      
       const method = editMode ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': session.user.id
+      const response = await apiFetch(
+        editMode ? `/atendentes/${atendente.id}` : '/atendentes',
+        {
+          method,
+          userId: session.user.id,
+          body: formData,
         },
-        body: JSON.stringify(formData)
-      });
+      );
 
       if (!response.ok) {
         const result = await response.json();

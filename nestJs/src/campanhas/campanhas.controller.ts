@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   Post,
   UseGuards,
@@ -11,6 +10,7 @@ import {
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CampanhasService } from './campanhas.service';
 import { CreateCampanhaDto } from './dto/create-campanha.dto';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Controller('campanhas')
 @UseGuards(AdminGuard)
@@ -18,13 +18,13 @@ export class CampanhasController {
   constructor(private readonly campanhasService: CampanhasService) {}
 
   @Get()
-  async listCampaigns(@Headers('x-user-id') userId: string) {
+  async listCampaigns(@CurrentUserId() userId: string) {
     return this.campanhasService.listCampaigns(userId);
   }
 
   @Get(':id')
   async getCampaignById(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Param('id') id: string,
   ) {
     return this.campanhasService.getCampaignById(userId, id);
@@ -32,7 +32,7 @@ export class CampanhasController {
 
   @Post()
   async createCampaign(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: CreateCampanhaDto,
   ) {
     return this.campanhasService.createCampaign(userId, dto);
@@ -40,7 +40,7 @@ export class CampanhasController {
 
   @Post(':id/start')
   async startCampaign(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Param('id') id: string,
   ) {
     return this.campanhasService.startCampaign(userId, id);

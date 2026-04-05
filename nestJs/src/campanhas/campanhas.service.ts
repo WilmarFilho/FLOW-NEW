@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/only-throw-error */
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -255,6 +256,7 @@ export class CampanhasService {
       })
       .eq('id', campaignId)
       .eq('profile_id', userId)
+      .eq('status', 'draft')
       .select(
         `
         *,
@@ -275,8 +277,14 @@ export class CampanhasService {
       .single();
 
     if (error || !startedCampaign) {
+      if (!error) {
+        throw new ConflictException(
+          'Esta campanha já foi iniciada por outro processo.',
+        );
+      }
+
       this.logger.error(
-        `Failed to start campaign ${campaignId}: ${error?.message}`,
+        `Failed to start campaign ${campaignId}: ${error.message}`,
       );
       throw error;
     }

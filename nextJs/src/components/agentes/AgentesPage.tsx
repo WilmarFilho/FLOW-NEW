@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
-import { ShoppingCart, MessageSquare, LifeBuoy, ArrowRight, X } from 'lucide-react';
+import { ShoppingCart, MessageSquare, LifeBuoy, ArrowRight } from 'lucide-react';
+import { apiRequest } from '@/lib/api/client';
+import { cardEntrance, listStagger, overlayFade, modalPop, headerEntrance } from '@/lib/motion/variants';
 import styles from './AgentesPage.module.css';
 
 interface Agente {
@@ -14,12 +16,8 @@ interface Agente {
   system_prompt: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 const fetchAgentes = async (): Promise<Agente[]> => {
-  const res = await fetch(`${API_URL}/agentes-ia`);
-  if (!res.ok) throw new Error('Failed to fetch');
-  return res.json();
+  return apiRequest<Agente[]>('/agentes-ia');
 };
 
 const SWR_OPTIONS = {
@@ -28,24 +26,6 @@ const SWR_OPTIONS = {
 };
 
 // ─── Animation Variants ───
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
-};
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20, scale: 0.97 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: 'spring', damping: 20, stiffness: 260 },
-  },
-};
-
 const IconMap: Record<string, React.ElementType> = {
   ShoppingCart,
   MessageSquare,
@@ -88,9 +68,9 @@ export default function AgentesPage() {
       {/* Header */}
       <motion.div
         className={`${styles.header} ${isLoading ? styles.contentBlurred : ''}`}
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        variants={headerEntrance}
+        initial="hidden"
+        animate="visible"
       >
         <div className={styles.titleArea}>
           <h1>Agentes IA</h1>
@@ -109,9 +89,9 @@ export default function AgentesPage() {
             <motion.div
               key="grid"
               className={styles.grid}
-              variants={containerVariants}
+              variants={listStagger}
               initial="hidden"
-              animate="show"
+              animate="visible"
               exit={{ opacity: 0 }}
             >
               {agentes.map((agente) => {
@@ -121,7 +101,7 @@ export default function AgentesPage() {
                   <motion.div
                     key={agente.id}
                     className={styles.card}
-                    variants={itemVariants}
+                    variants={cardEntrance}
                     layout
                     onClick={() => setSelectedAgente(agente)}
                   >
@@ -155,17 +135,18 @@ export default function AgentesPage() {
         {selectedAgente && (
           <motion.div
             className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={overlayFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={() => setSelectedAgente(null)}
           >
             <motion.div
               className={styles.modalContent}
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              variants={modalPop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
               <div className={styles.modalHeader}>

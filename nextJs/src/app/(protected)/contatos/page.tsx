@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import ContatosClient from './contatos.client';
+import styles from '../ProtectedPage.module.css';
 
 export const metadata: Metadata = {
   title: 'Contatos | CRM - NKW FLOW',
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ContatosPage() {
   return (
-    <main className="flex-1 w-full h-full flex flex-col p-4 sm:p-6 overflow-hidden">
+    <main className={styles.page}>
       {/* Client Component that handles logic and views */}
       <ContatosClient />
     </main>

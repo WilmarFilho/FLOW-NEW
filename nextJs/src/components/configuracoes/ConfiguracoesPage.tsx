@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Save, Shield, Settings, User, UploadCloud, Plug, Trash2, AlertTriangle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch, apiRequest } from '@/lib/api/client';
 import styles from './ConfiguracoesPage.module.css';
 
 interface InitialData {
@@ -20,8 +21,6 @@ interface InitialData {
   mostra_nome_mensagens: boolean;
   notificacao_para_entrar_conversa: boolean;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface ConfiguracoesPageProps {
   initialData: InitialData;
@@ -73,9 +72,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
   const fetchGoogleStatus = async () => {
     try {
-      const res = await fetch(`${API_URL}/google/status`, {
-        headers: { 'x-user-id': initialData.auth_id }
-      });
+      const res = await apiFetch('/google/status', { userId: initialData.auth_id });
       if (res.ok) {
         const data = await res.json();
         setGoogleStatus(data);
@@ -88,9 +85,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
   const handleConnectGoogle = async () => {
     setIsLoadingGoogle(true);
     try {
-      const res = await fetch(`${API_URL}/google/auth-url`, {
-        headers: { 'x-user-id': initialData.auth_id }
-      });
+      const res = await apiFetch('/google/auth-url', { userId: initialData.auth_id });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -112,9 +107,9 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
     setShowDisconnectConfirm(false);
     setIsLoadingGoogle(true);
     try {
-      const res = await fetch(`${API_URL}/google/disconnect`, {
+      const res = await apiFetch('/google/disconnect', {
         method: 'DELETE',
-        headers: { 'x-user-id': initialData.auth_id }
+        userId: initialData.auth_id,
       });
       if (res.ok) {
         toast.success("Integração do Google Calendar desconectada.");
@@ -142,23 +137,16 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
         if (passError) throw passError;
       }
 
-      const response = await fetch(`${API_URL}/profile`, {
+      await apiRequest('/profile', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': initialData.auth_id
-        },
-        body: JSON.stringify({
+        userId: initialData.auth_id,
+        body: {
           nome_completo: nome,
           cidade,
           endereco,
           numero
-        })
+        },
       });
-
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar perfil');
-      }
 
       router.refresh();
       setSenha('');
@@ -181,12 +169,10 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${API_URL}/profile/avatar`, {
+      const response = await apiFetch('/profile/avatar', {
         method: 'POST',
-        headers: {
-          'x-user-id': initialData.auth_id
-        },
-        body: formData
+        userId: initialData.auth_id,
+        body: formData,
       });
 
       if (!response.ok) {
@@ -441,21 +427,14 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                   onClick={async () => {
                     setIsSaving(true);
                     try {
-                      const response = await fetch(`${API_URL}/profile`, {
+                      await apiRequest('/profile', {
                         method: 'PATCH',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'x-user-id': initialData.auth_id
-                        },
-                        body: JSON.stringify({
+                        userId: initialData.auth_id,
+                        body: {
                           mostra_nome_mensagens: mostraNomeMensagens,
                           notificacao_para_entrar_conversa: notificacaoEntrarConversa
-                        })
+                        },
                       });
-
-                      if (!response.ok) {
-                        throw new Error('Falha ao atualizar configurações');
-                      }
 
                       router.refresh();
                       toast.success('Configurações de sistema salvas!');
@@ -591,4 +570,3 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
     </div>
   );
 }
-

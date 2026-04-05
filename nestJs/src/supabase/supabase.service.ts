@@ -24,4 +24,17 @@ export class SupabaseService {
   getClient(): SupabaseClient {
     return this.clientInstance;
   }
+
+  async verifyAccessToken(token: string) {
+    const {
+      data: { user },
+      error,
+    } = await this.clientInstance.auth.getUser(token);
+
+    if (error || !user) {
+      return null;
+    }
+
+    return user;
+  }
 }

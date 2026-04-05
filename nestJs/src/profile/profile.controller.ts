@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Headers,
   Patch,
   Post,
   UploadedFile,
@@ -11,6 +10,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileService } from './profile.service';
 import { UserGuard } from '../common/guards/user.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Controller('profile')
 export class ProfileController {
@@ -19,7 +19,7 @@ export class ProfileController {
   @Patch()
   @UseGuards(UserGuard)
   async updateProfile(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() updateData: any,
   ) {
     return this.profileService.updateProfile(userId, updateData);
@@ -29,7 +29,7 @@ export class ProfileController {
   @UseGuards(UserGuard)
   @UseInterceptors(FileInterceptor('file'))
   async updateAvatar(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.profileService.updateAvatar(userId, file);

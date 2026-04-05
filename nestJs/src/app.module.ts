@@ -15,6 +15,7 @@ import { ProfileModule } from './profile/profile.module';
 import { AgendamentosModule } from './agendamentos/agendamentos.module';
 import { GoogleModule } from './google/google.module';
 import { CampanhasModule } from './campanhas/campanhas.module';
+import { ConversasModule } from './conversas/conversas.module';
 
 import { ContatosModule } from './contatos/contatos.module';
 
@@ -33,6 +34,7 @@ import { ContatosModule } from './contatos/contatos.module';
     GoogleModule,
     ContatosModule,
     CampanhasModule,
+    ConversasModule,
   ],
   controllers: [AppController],
   providers: [

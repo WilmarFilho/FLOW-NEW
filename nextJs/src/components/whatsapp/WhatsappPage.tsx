@@ -3,9 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, MessageCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import useSWR, { mutate } from 'swr';
+import useSWR from 'swr';
 import { supabase } from '@/lib/supabaseClient';
+import { apiRequest, API_URL } from '@/lib/api/client';
 import { logger } from '@/lib/logger.api';
+import {
+  pageEntrance,
+  headerEntrance,
+  listStagger,
+  cardEntrance,
+  overlayFade,
+  modalPop,
+  emptyStateEntrance,
+  emptyStateChild,
+} from '@/lib/motion/variants';
 import ConnectionCard from './ConnectionCard';
 import ConnectionModal from './ConnectionModal';
 import TestModal from './TestModal';
@@ -14,15 +25,9 @@ import type { WhatsappConnection } from './ConnectionCard';
 
 type FilterStatus = 'todos' | 'connected' | 'disconnected';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 // ── SWR Fetchers ──────────────────────────────────────────────────
 const fetchConnections = async (uid: string) => {
-  const res = await fetch(`${API_URL}/whatsapp`, {
-    headers: { 'x-user-id': uid },
-  });
-  if (!res.ok) throw new Error('Falha ao buscar conexões');
-  return (await res.json()) as WhatsappConnection[];
+  return apiRequest<WhatsappConnection[]>('/whatsapp', { userId: uid });
 };
 
 const fetchAgentes = async () => {
@@ -51,24 +56,6 @@ const SWR_OPTIONS = {
 };
 
 // ── Framer Motion Variants ────────────────────────────────────────
-const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
-
-const headerVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: 0.1 },
-  },
-};
-
 const filterBarVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -90,33 +77,6 @@ const filterChipVariant = {
   },
 };
 
-const gridVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.15,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 25, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: 'spring' as const, stiffness: 300, damping: 24 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.9,
-    y: -10,
-    transition: { duration: 0.25, ease: 'easeInOut' as const },
-  },
-};
-
 const loadingOverlayVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -135,52 +95,6 @@ const spinnerVariants = {
     scale: 1,
     opacity: 1,
     transition: { type: 'spring' as const, stiffness: 260, damping: 20 },
-  },
-};
-
-const emptyStateVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const,
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const emptyChildVariant = {
-  hidden: { opacity: 0, y: 15 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' as const },
-  },
-};
-
-const modalBackdropVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.2 } },
-  exit: { opacity: 0, transition: { duration: 0.2 } },
-};
-
-const modalVariants = {
-  hidden: { opacity: 0, scale: 0.92, y: 30 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring' as const, stiffness: 350, damping: 28 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.92,
-    y: 30,
-    transition: { duration: 0.2, ease: 'easeIn' as const },
   },
 };
 
@@ -241,7 +155,7 @@ export default function WhatsappPage() {
           table: 'whatsapp_connections',
         },
         (payload) => {
-          const record = (payload.new || payload.old) as any;
+          const record = (payload.new || payload.old) as { user_id?: string; id?: string } | null;
           if (record?.user_id && record.user_id !== userId) return;
 
           // Optimistically update SWR cache
@@ -255,7 +169,9 @@ export default function WhatsappPage() {
                   : conn
               );
             } else if (payload.eventType === 'DELETE') {
-              return current.filter((conn) => conn.id !== (payload.old as any).id);
+              return current.filter(
+                (conn) => conn.id !== ((payload.old as { id?: string } | null)?.id)
+              );
             }
             return current;
           }, { revalidate: false });
@@ -283,25 +199,16 @@ export default function WhatsappPage() {
       conhecimento_id?: string;
       useQR: boolean;
     }) => {
-      const response = await fetch(`${API_URL}/whatsapp`, {
+      const result = await apiRequest<{ connection?: { id?: string | null } }>('/whatsapp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify({
+        userId,
+        body: {
           nome: data.nome,
           numero: data.numero,
           agente_id: data.agente_id,
           conhecimento_id: data.conhecimento_id,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        throw new Error('Falha ao criar conexão');
-      }
-
-      const result = await response.json();
       // Revalidate connections after create
       mutateConnections();
       return {
@@ -315,20 +222,11 @@ export default function WhatsappPage() {
   // Update connection
   const handleUpdate = useCallback(
     async (id: string, data: { nome?: string; agente_id?: string; conhecimento_id?: string }) => {
-      const response = await fetch(`${API_URL}/whatsapp/${id}`, {
+      const updated = await apiRequest<Partial<WhatsappConnection>>(`/whatsapp/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify(data),
+        userId,
+        body: data,
       });
-
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar conexão');
-      }
-
-      const updated = await response.json();
       // Optimistic update + revalidate
       mutateConnections(
         (current = []) => current.map((c) => (c.id === id ? { ...c, ...updated } : c)),
@@ -342,9 +240,9 @@ export default function WhatsappPage() {
   const handleCancelConnection = useCallback(
     async (connectionId: string) => {
       try {
-        await fetch(`${API_URL}/whatsapp/${connectionId}`, {
+        await apiRequest(`/whatsapp/${connectionId}`, {
           method: 'DELETE',
-          headers: { 'x-user-id': userId },
+          userId,
         });
         mutateConnections(
           (current = []) => current.filter((c) => c.id !== connectionId),
@@ -362,19 +260,15 @@ export default function WhatsappPage() {
     async (conn: WhatsappConnection) => {
       setIsDeleting(true);
       try {
-        const response = await fetch(`${API_URL}/whatsapp/${conn.id}`, {
+        await apiRequest(`/whatsapp/${conn.id}`, {
           method: 'DELETE',
-          headers: { 'x-user-id': userId },
+          userId,
         });
-
-        if (response.ok) {
-          // Optimistic removal
-          mutateConnections(
-            (current = []) => current.filter((c) => c.id !== conn.id),
-            { revalidate: false }
-          );
-          setDeleteConnection(null);
-        }
+        mutateConnections(
+          (current = []) => current.filter((c) => c.id !== conn.id),
+          { revalidate: false }
+        );
+        setDeleteConnection(null);
       } catch (err) {
         logger.error('whatsapp.delete', err);
       } finally {
@@ -391,14 +285,14 @@ export default function WhatsappPage() {
     <motion.div
       className={styles.pageWrapper}
       style={{ position: 'relative' }}
-      variants={pageVariants}
+      variants={pageEntrance}
       initial="hidden"
       animate="visible"
     >
       {/* Header */}
       <motion.div
         className={`${styles.pageHeader} ${isLoading ? styles.contentBlurred : ''}`}
-        variants={headerVariants}
+        variants={headerEntrance}
         initial="hidden"
         animate="visible"
       >
@@ -490,20 +384,20 @@ export default function WhatsappPage() {
             <motion.div
               key="empty"
               className={styles.emptyState}
-              variants={emptyStateVariants}
+              variants={emptyStateEntrance}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              <motion.div className={styles.emptyIcon} variants={emptyChildVariant}>
+              <motion.div className={styles.emptyIcon} variants={emptyStateChild}>
                 <MessageCircle size={36} color="rgba(255,255,255,0.3)" />
               </motion.div>
-              <motion.h3 variants={emptyChildVariant}>
+              <motion.h3 variants={emptyStateChild}>
                 {totalCount === 0
                   ? 'Nenhuma conexão ainda'
                   : 'Nenhuma conexão com este filtro'}
               </motion.h3>
-              <motion.p variants={emptyChildVariant}>
+              <motion.p variants={emptyStateChild}>
                 {totalCount === 0
                   ? 'Adicione sua primeira conexão WhatsApp para começar a automatizar seu atendimento.'
                   : 'Tente alterar o filtro para ver mais conexões.'}
@@ -513,7 +407,7 @@ export default function WhatsappPage() {
             <motion.div
               key="grid"
               className={styles.connectionGrid}
-              variants={gridVariants}
+              variants={listStagger}
               initial="hidden"
               animate="visible"
             >
@@ -521,7 +415,7 @@ export default function WhatsappPage() {
                 {filteredConnections.map((conn) => (
                   <motion.div
                     key={conn.id}
-                    variants={cardVariants}
+                    variants={cardEntrance}
                     initial="hidden"
                     animate="visible"
                     exit="exit"
@@ -583,7 +477,7 @@ export default function WhatsappPage() {
           <motion.div
             className={styles.modalBackdrop}
             onClick={() => setDeleteConnection(null)}
-            variants={modalBackdropVariants}
+            variants={overlayFade}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -591,7 +485,7 @@ export default function WhatsappPage() {
             <motion.div
               className={styles.modal}
               onClick={(e) => e.stopPropagation()}
-              variants={modalVariants}
+              variants={modalPop}
               initial="hidden"
               animate="visible"
               exit="exit"

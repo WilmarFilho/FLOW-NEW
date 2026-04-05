@@ -1,6 +1,7 @@
-import { Controller, Post, Body, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { HelpService } from './help.service';
 import { UserGuard } from '../common/guards/user.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Controller('help')
 @UseGuards(UserGuard)
@@ -9,7 +10,7 @@ export class HelpController {
 
   @Post('ask')
   async ask(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body('question') question: string,
   ) {
     if (!question) {

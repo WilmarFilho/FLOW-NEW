@@ -3,55 +3,44 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Post,
   Put,
-  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { AgendamentosService } from './agendamentos.service';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
+import { UserGuard } from '../common/guards/user.guard';
 
 @Controller('agendamentos')
+@UseGuards(UserGuard)
 export class AgendamentosController {
   constructor(private readonly service: AgendamentosService) {}
 
-  private validateAuth(userId: string) {
-    if (!userId) {
-      throw new UnauthorizedException('Usuário não autenticado');
-    }
-  }
-
   @Get()
-  async list(@Headers('x-user-id') userId: string) {
-    this.validateAuth(userId);
+  async list(@CurrentUserId() userId: string) {
     return this.service.listAgendamentos(userId);
   }
 
   @Post()
-  async create(
-    @Headers('x-user-id') userId: string,
-    @Body() dto: any,
-  ) {
-    this.validateAuth(userId);
+  async create(@CurrentUserId() userId: string, @Body() dto: any) {
     return this.service.createAgendamento(userId, dto);
   }
 
   @Put(':id')
   async updateStatus(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: { status: string },
   ) {
-    this.validateAuth(userId);
     return this.service.updateStatus(userId, id, dto.status);
   }
 
   @Delete(':id')
   async delete(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
   ) {
-    this.validateAuth(userId);
     return this.service.deleteAgendamento(userId, id);
   }
 }

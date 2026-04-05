@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import CampaignsPage from '@/components/campanhas/CampaignsPage';
+import styles from '../ProtectedPage.module.css';
 
 export const metadata: Metadata = {
   title: 'Campanhas | FLOW',
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function CampanhasRoute() {
   return (
-    <main className="flex-1 w-full h-full flex flex-col p-4 sm:p-6 overflow-hidden">
+    <main className={styles.page}>
       <CampaignsPage />
     </main>
   );

@@ -1,10 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Users, User, Calendar, MessageCircle, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Users, User, Calendar, MessageCircle, Edit2, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
 import { supabase } from '@/lib/supabaseClient';
+import { apiRequest } from '@/lib/api/client';
+import {
+  pageEntrance,
+  headerEntrance,
+  listStagger,
+  cardEntrance,
+  overlayFade,
+  modalPop,
+  emptyStateEntrance,
+  emptyStateChild,
+} from '@/lib/motion/variants';
 import ModalAdicionarAtendente from './ModalAdicionarAtendente';
 import styles from './AtendentesPage.module.css';
 
@@ -20,14 +31,8 @@ interface AtendenteData {
   };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 const fetchAtendentes = async (uid: string) => {
-  const res = await fetch(`${API_URL}/atendentes`, {
-    headers: { 'x-user-id': uid },
-  });
-  if (!res.ok) throw new Error('Falha ao buscar atendentes');
-  return (await res.json()) as AtendenteData[];
+  return apiRequest<AtendenteData[]>('/atendentes', { userId: uid });
 };
 
 const SWR_OPTIONS = {
@@ -38,51 +43,6 @@ const SWR_OPTIONS = {
 };
 
 // ── Framer Motion Variants ────────────────────────────────────────
-const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
-
-const headerVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: 0.1 },
-  },
-};
-
-const gridVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.15,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 25, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: 'spring' as const, stiffness: 300, damping: 24 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.9,
-    y: -10,
-    transition: { duration: 0.25, ease: 'easeInOut' as const },
-  },
-};
-
 const loadingOverlayVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -101,52 +61,6 @@ const spinnerVariants = {
     scale: 1,
     opacity: 1,
     transition: { type: 'spring' as const, stiffness: 260, damping: 20 },
-  },
-};
-
-const emptyStateVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const,
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const emptyChildVariant = {
-  hidden: { opacity: 0, y: 15 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' as const },
-  },
-};
-
-const modalBackdropVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.2 } },
-  exit: { opacity: 0, transition: { duration: 0.2 } },
-};
-
-const modalVariants = {
-  hidden: { opacity: 0, scale: 0.92, y: 30 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring' as const, stiffness: 350, damping: 28 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.92,
-    y: 30,
-    transition: { duration: 0.2, ease: 'easeIn' as const },
   },
 };
 
@@ -186,22 +100,18 @@ export default function AtendentesPage() {
     if (!deleteAtendente) return;
     setIsDeleting(true);
     try {
-      const response = await fetch(`${API_URL}/atendentes/${deleteAtendente.id}`, {
+      await apiRequest(`/atendentes/${deleteAtendente.id}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-id': userId
-        }
+        userId,
       });
-
-      if (!response.ok) throw new Error('Falha ao excluir atendente');
 
       mutateAtendentes(
         (current = []) => current.filter((a) => a.id !== deleteAtendente.id),
         { revalidate: false }
       );
       setDeleteAtendente(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao excluir atendente');
     } finally {
       setIsDeleting(false);
     }
@@ -211,11 +121,11 @@ export default function AtendentesPage() {
     <motion.div
       className={styles.pageWrapper}
       style={{ position: 'relative' }}
-      variants={pageVariants}
+      variants={pageEntrance}
       initial="hidden"
       animate="visible"
     >
-      <motion.header className={`${styles.pageHeader} ${isLoading ? styles.contentBlurred : ''}`} variants={headerVariants}>
+      <motion.header className={`${styles.pageHeader} ${isLoading ? styles.contentBlurred : ''}`} variants={headerEntrance}>
         <div>
           <h1>Contas de Atendentes</h1>
           <p>
@@ -273,22 +183,22 @@ export default function AtendentesPage() {
             <motion.div
               key="empty"
               className={styles.emptyState}
-              variants={emptyStateVariants}
+              variants={emptyStateEntrance}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              <motion.div className={styles.emptyIcon} variants={emptyChildVariant}>
+              <motion.div className={styles.emptyIcon} variants={emptyStateChild}>
                 <Users size={36} color="rgba(255,255,255,0.3)" />
               </motion.div>
-              <motion.h3 variants={emptyChildVariant}>Nenhum atendente cadastrado</motion.h3>
-              <motion.p variants={emptyChildVariant}>Comece criando seu primeiro atendente para distribuir suas conversas.</motion.p>
+              <motion.h3 variants={emptyStateChild}>Nenhum atendente cadastrado</motion.h3>
+              <motion.p variants={emptyStateChild}>Comece criando seu primeiro atendente para distribuir suas conversas.</motion.p>
             </motion.div>
           ) : (
             <motion.div
               key="grid"
               className={styles.atendenteGrid}
-              variants={gridVariants}
+              variants={listStagger}
               initial="hidden"
               animate="visible"
             >
@@ -297,7 +207,7 @@ export default function AtendentesPage() {
                   <motion.div
                     key={atendente.id}
                     className={styles.card}
-                    variants={cardVariants}
+                    variants={cardEntrance}
                     layout
                     initial="hidden"
                     animate="visible"
@@ -371,7 +281,7 @@ export default function AtendentesPage() {
         {deleteAtendente && (
           <motion.div
             className={styles.modalBackdrop}
-            variants={modalBackdropVariants}
+            variants={overlayFade}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -379,7 +289,7 @@ export default function AtendentesPage() {
           >
             <motion.div
               className={styles.modal}
-              variants={modalVariants}
+              variants={modalPop}
               onClick={e => e.stopPropagation()}
             >
               <div className={styles.modalHeader}>

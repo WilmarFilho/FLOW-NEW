@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageCircle, User, Bot, HelpCircle, Phone, ArrowUpRight } from 'lucide-react';
+import { Send, User, Bot, HelpCircle, Phone, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
+import { apiRequest } from '@/lib/api/client';
+import { pageEntrance, cardEntrance } from '@/lib/motion/variants';
 import styles from './HelpPage.module.css';
 
 interface Message {
@@ -12,25 +14,6 @@ interface Message {
   content: string;
   timestamp: string;
 }
-
-const containerVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const }
-  },
-} as const;
-
-const messageVariants = {
-  hidden: { opacity: 0, scale: 0.9, y: 10 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring' as const, stiffness: 500, damping: 30 }
-  },
-} as const;
 
 export default function HelpPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -66,19 +49,11 @@ export default function HelpPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
 
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${NEXT_PUBLIC_API_URL}/help/ask`, {
+      const data = await apiRequest<{ answer: string; timestamp: string }>('/help/ask', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': session.user.id
-        },
-        body: JSON.stringify({ question: userMessage.content })
+        userId: session.user.id,
+        body: { question: userMessage.content },
       });
-
-      if (!response.ok) throw new Error('Falha na comunicação');
-
-      const data = await response.json();
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -105,7 +80,7 @@ export default function HelpPage() {
   return (
     <motion.div
       className={styles.pageWrapper}
-      variants={containerVariants}
+      variants={pageEntrance}
       initial="hidden"
       animate="visible"
     >
@@ -143,7 +118,7 @@ export default function HelpPage() {
               <motion.div
                 key={msg.id}
                 className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
-                variants={messageVariants}
+                variants={cardEntrance}
                 initial="hidden"
                 animate="visible"
               >

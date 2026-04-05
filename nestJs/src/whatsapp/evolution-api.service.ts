@@ -119,4 +119,17 @@ export class EvolutionApiService {
       text,
     });
   }
+
+  async getBase64FromMediaMessage(
+    connectionId: string,
+    messagePayload: Record<string, unknown>,
+  ): Promise<any> {
+    return this.request(
+      'POST',
+      `/chat/getBase64FromMediaMessage/${connectionId}`,
+      {
+        message: messagePayload,
+      },
+    );
+  }
 }

@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Post,
   Put,
@@ -14,6 +13,8 @@ import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import { UpdateWhatsappDto } from './dto/update-whatsapp.dto';
 import { TestMessageDto } from './dto/test-message.dto';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
+import { WhatsappWebhookGuard } from '../common/guards/whatsapp-webhook.guard';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -25,7 +26,7 @@ export class WhatsappController {
    */
   @Get()
   @UseGuards(AdminGuard)
-  async listConnections(@Headers('x-user-id') userId: string) {
+  async listConnections(@CurrentUserId() userId: string) {
     return this.whatsappService.listConnections(userId);
   }
 
@@ -36,7 +37,7 @@ export class WhatsappController {
   @Post()
   @UseGuards(AdminGuard)
   async createConnection(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: CreateWhatsappDto,
   ) {
     dto.user_id = userId;
@@ -51,7 +52,7 @@ export class WhatsappController {
   @UseGuards(AdminGuard)
   async updateConnection(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: UpdateWhatsappDto,
   ) {
     return this.whatsappService.updateConnection(id, userId, dto);
@@ -65,7 +66,7 @@ export class WhatsappController {
   @UseGuards(AdminGuard)
   async deleteConnection(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
   ) {
     return this.whatsappService.deleteConnection(id, userId);
   }
@@ -78,7 +79,7 @@ export class WhatsappController {
   @UseGuards(AdminGuard)
   async sendTestMessage(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: TestMessageDto,
   ) {
     return this.whatsappService.sendTestMessage(id, userId, dto.number, dto.message);
@@ -89,6 +90,7 @@ export class WhatsappController {
    * Recebe eventos da Evolution API (connection.update, qrcode.updated, etc)
    */
   @Post('webhook')
+  @UseGuards(WhatsappWebhookGuard)
   async handleWebhook(@Body() payload: any) {
     return this.whatsappService.handleWebhook(payload);
   }

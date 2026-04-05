@@ -7,15 +7,10 @@ import { Phone, Search, User, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import ModalConfirmacao from '@/components/contatos/ModalConfirmacao';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiRequest } from '@/lib/api/client';
 
 const fetcher = async (url: string, uid: string) => {
-  const res = await fetch(API_URL + url, {
-    headers: { 'x-user-id': uid },
-  });
-  if (!res.ok) throw new Error('API Error');
-  return res.json();
+  return apiRequest<any[]>(url, { userId: uid });
 };
 
 export default function ListTab() {
@@ -49,20 +44,15 @@ export default function ListTab() {
     if (!deleteId) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API_URL}/contatos/${deleteId}`, {
+      await apiRequest(`/contatos/${deleteId}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': userId }
+        userId,
       });
-      if (res.ok) {
-        toast.success("Contato excluído definitivamente!");
-        globalMutate(['/contatos', userId]);
-        setDeleteId(null);
-      } else {
-        const error = await res.json();
-        toast.error(error.message || "Erro ao excluir contato");
-      }
+      toast.success("Contato excluído definitivamente!");
+      globalMutate(['/contatos', userId]);
+      setDeleteId(null);
     } catch (e) {
-      toast.error("Erro de conexão");
+      toast.error(e instanceof Error ? e.message : "Erro de conexão");
     } finally {
       setIsDeleting(false);
     }

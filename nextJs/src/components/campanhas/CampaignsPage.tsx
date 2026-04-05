@@ -1,18 +1,32 @@
 'use client';
 
 import { startTransition, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { ArrowLeft, CheckCircle2, Clock3, ListChecks, Play, Radio, Send, Users } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  ListChecks,
+  Play,
+  Radio,
+  Search,
+  Send,
+  Users,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiRequest } from '@/lib/api/client';
+import { cardEntrance, listStagger, pageEntrance, sectionEntrance, modalPop, overlayFade } from '@/lib/motion/variants';
 
 type CampaignView = 'list' | 'create' | 'detail';
 type CampaignStatus = 'draft' | 'running' | 'completed' | 'failed';
 type RecipientStatus = 'pending' | 'sent' | 'failed';
+type CreateStep = 0 | 1 | 2;
+type PickerModalType = 'whatsapp' | 'lista' | null;
 
 interface WhatsappConnection {
   id: string;
@@ -58,26 +72,31 @@ interface CampaignDetail extends Campaign {
   destinatarios: CampaignRecipient[];
 }
 
-const pageVariants = {
-  hidden: { opacity: 0, y: 18 },
+interface RefinedSelectOption {
+  id: string;
+  title: string;
+  subtitle: string;
+  accent?: string | null;
+}
+
+const stepPanelVariants = {
+  hidden: { opacity: 0, x: 24, scale: 0.985 },
   visible: {
     opacity: 1,
-    y: 0,
-    transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] as const },
+    x: 0,
+    scale: 1,
+    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] as const },
+  },
+  exit: {
+    opacity: 0,
+    x: -24,
+    scale: 0.985,
+    transition: { duration: 0.18, ease: 'easeInOut' as const },
   },
 };
 
 const fetcher = async <T,>(path: string, userId: string): Promise<T> => {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'x-user-id': userId },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(error?.message || 'Falha na comunicação com o servidor.');
-  }
-
-  return response.json();
+  return apiRequest<T>(path, { userId });
 };
 
 const statusLabel: Record<CampaignStatus, string> = {
@@ -123,12 +142,184 @@ function progressPercentage(campaign: Pick<Campaign, 'total_contatos' | 'pendent
   );
 }
 
+function RefinedSelect({
+  label,
+  placeholder,
+  value,
+  selectedOption,
+  onOpen,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  selectedOption: RefinedSelectOption | null;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <label className="text-sm font-bold text-white">{label}</label>
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-left transition hover:border-white/12 hover:bg-[rgba(10,20,38,0.98)] ${value ? 'shadow-[0_0_0_1px_rgba(255,255,255,0.04)]' : ''
+          }`}
+        onClick={onOpen}
+      >
+        <div className="min-w-0">
+          {selectedOption ? (
+            <>
+              <span className="block truncate text-sm font-semibold text-white">{selectedOption.title}</span>
+              <span className="mt-1 block truncate text-[12px] text-white/45">{selectedOption.subtitle}</span>
+            </>
+          ) : (
+            <span className="block text-sm text-white/45">{placeholder}</span>
+          )}
+        </div>
+        <ChevronDown size={18} className="shrink-0 text-white/45" />
+      </button>
+    </div>
+  );
+}
+
+function SelectionModal({
+  isOpen,
+  title,
+  subtitle,
+  options,
+  value,
+  emptyMessage,
+  onClose,
+  onSelect,
+}: {
+  isOpen: boolean;
+  title: string;
+  subtitle: string;
+  options: RefinedSelectOption[];
+  value: string;
+  emptyMessage: string;
+  onClose: () => void;
+  onSelect: (value: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+
+  const filteredOptions = options.filter((option) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+
+    return (
+      option.title.toLowerCase().includes(query) ||
+      option.subtitle.toLowerCase().includes(query)
+    );
+  });
+
+  const modalContent = (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(3,7,16,0.72)] p-4 backdrop-blur-md"
+          variants={overlayFade}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          onClick={onClose}
+        >
+          <motion.div
+            className="flex max-h-[min(82vh,760px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,31,0.98)_0%,rgba(5,10,20,1)_100%)] shadow-[0_30px_90px_rgba(0,0,0,0.42)]"
+            variants={modalPop}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-white/6 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="m-0 text-[24px] text-white">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/55">{subtitle}</p>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+                  onClick={onClose}
+                >
+                  <ArrowLeft size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/8 bg-white/5 px-3 py-3">
+                <Search size={16} className="text-white/35" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                />
+              </div>
+            </div>
+
+            <div className="scrollbar-none grid max-h-full gap-3 overflow-auto p-5">
+              {filteredOptions.length === 0 ? (
+                <div className="rounded-[22px] border border-dashed border-white/8 px-4 py-10 text-center text-sm text-white/35">
+                  {emptyMessage}
+                </div>
+              ) : (
+                filteredOptions.map((option) => {
+                  const isSelected = option.id === value;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(option.id);
+                        onClose();
+                      }}
+                      className={`flex items-start justify-between gap-3 rounded-[22px] border px-4 py-4 text-left transition ${isSelected
+                        ? 'border-[rgba(242,228,22,0.18)] bg-[rgba(242,228,22,0.08)]'
+                        : 'border-white/6 bg-white/4 hover:border-white/12 hover:bg-white/8'
+                        }`}
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: option.accent || '#1269f4' }}
+                        />
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-white">{option.title}</span>
+                          <span className="mt-1 block text-[12px] leading-5 text-white/45">
+                            {option.subtitle}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <CheckCircle2 size={18} className="shrink-0 text-[var(--color-secondary)]" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(modalContent, document.body);
+}
+
 export default function CampaignsPage() {
   const [userId, setUserId] = useState('');
   const [view, setView] = useState<CampaignView>('list');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [createStep, setCreateStep] = useState<CreateStep>(0);
+  const [pickerModal, setPickerModal] = useState<PickerModalType>(null);
   const [formData, setFormData] = useState({
     nome: '',
     whatsapp_connection_id: '',
@@ -210,14 +401,34 @@ export default function CampaignsPage() {
   const totalRunning = campaigns.filter((campaign) => campaign.status === 'running').length;
   const totalCompleted = campaigns.filter((campaign) => campaign.status === 'completed').length;
 
+  const connectionOptions: RefinedSelectOption[] = connectedConnections.map((connection) => ({
+    id: connection.id,
+    title: connection.nome,
+    subtitle: connection.numero ? `Número conectado: ${connection.numero}` : 'Conexão pronta para disparo',
+    accent: '#22c55e',
+  }));
+
+  const listOptions: RefinedSelectOption[] = lists.map((list) => ({
+    id: list.id,
+    title: list.nome,
+    subtitle: `${list.cards?.length || 0} contato(s) disponíveis`,
+    accent: list.cor || '#1269f4',
+  }));
+
   const selectedConnection = connectedConnections.find(
     (connection) => connection.id === formData.whatsapp_connection_id,
   );
   const selectedList = lists.find((list) => list.id === formData.lista_id);
+  const selectedConnectionOption =
+    connectionOptions.find((option) => option.id === formData.whatsapp_connection_id) ?? null;
+  const selectedListOption =
+    listOptions.find((option) => option.id === formData.lista_id) ?? null;
 
   const openCreate = () => {
     startTransition(() => {
       setSelectedCampaignId(null);
+      setCreateStep(0);
+      setPickerModal(null);
       setView('create');
     });
   };
@@ -225,6 +436,7 @@ export default function CampaignsPage() {
   const openList = () => {
     startTransition(() => {
       setSelectedCampaignId(null);
+      setPickerModal(null);
       setView('list');
     });
   };
@@ -249,26 +461,16 @@ export default function CampaignsPage() {
     setIsCreating(true);
 
     try {
-      const response = await fetch(`${API_URL}/campanhas`, {
+      const createdCampaign = await apiRequest<CampaignDetail>('/campanhas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify({
+        userId,
+        body: {
           nome: formData.nome.trim(),
           mensagem: formData.mensagem.trim(),
           lista_id: formData.lista_id,
           whatsapp_connection_id: formData.whatsapp_connection_id,
-        }),
+        },
       });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.message || 'Não foi possível criar a campanha.');
-      }
-
-      const createdCampaign = payload as CampaignDetail;
 
       setFormData({
         nome: '',
@@ -276,6 +478,7 @@ export default function CampaignsPage() {
         lista_id: '',
         mensagem: '',
       });
+      setCreateStep(0);
 
       toast.success('Campanha criada com sucesso. Agora você já pode iniciar o disparo.');
       await mutateCampaigns();
@@ -293,15 +496,10 @@ export default function CampaignsPage() {
     setIsStarting(true);
 
     try {
-      const response = await fetch(`${API_URL}/campanhas/${campaignDetail.id}/start`, {
+      await apiRequest(`/campanhas/${campaignDetail.id}/start`, {
         method: 'POST',
-        headers: { 'x-user-id': userId },
+        userId,
       });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.message || 'Não foi possível iniciar a campanha.');
-      }
 
       toast.success('Campanha iniciada. O progresso será atualizado automaticamente.');
       await Promise.all([mutateCampaigns(), mutateDetail()]);
@@ -312,19 +510,23 @@ export default function CampaignsPage() {
     }
   };
 
+  const canAdvanceFromStepOne = formData.nome.trim().length >= 3;
+  const canAdvanceFromStepTwo =
+    Boolean(formData.whatsapp_connection_id) && Boolean(formData.lista_id);
+  const canSubmitCampaign = Boolean(formData.mensagem.trim()) && canAdvanceFromStepOne && canAdvanceFromStepTwo;
+
   return (
     <motion.div
       className="flex flex-1 min-h-0 flex-col gap-5"
-      variants={pageVariants}
+      variants={pageEntrance}
       initial="hidden"
       animate="visible"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="m-0 text-[clamp(30px,4vw,38px)] leading-[1.05] text-white">Campanhas</h1>
-          <p className="mt-2.5 max-w-[760px] text-[15px] leading-7 text-white/55">
-            Monte campanhas com listas de contatos e dispare pelo WhatsApp conectado. O processamento roda no Nest
-            e o progresso volta em tempo real para a tela.
+          <p className="mt-2.5 max-w-[760px] text-[15px] leading-7 text-white/55 text-wrap-balance">
+            Monte campanhas com listas de contatos e dispare pelo WhatsApp conectado.
           </p>
         </div>
 
@@ -350,454 +552,634 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      <section className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(18,105,244,0.22),transparent_34%),radial-gradient(circle_at_top_right,rgba(242,228,22,0.1),transparent_28%),linear-gradient(180deg,rgba(8,16,31,0.96)_0%,rgba(5,10,20,0.98)_100%)] shadow-[var(--shadow-elevated)]">
-        <div className="grid grid-cols-1 gap-3 p-[18px] md:grid-cols-3">
-          <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl">
-            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Campanhas</span>
-            <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{campaigns.length}</strong>
-            <span className="mt-1.5 block text-[13px] text-white/55">Rascunhos e disparos no mesmo painel</span>
-          </div>
-          <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl">
-            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Em andamento</span>
-            <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{totalRunning}</strong>
-            <span className="mt-1.5 block text-[13px] text-white/55">Atualização dinâmica via realtime</span>
-          </div>
-          <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl">
-            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Destinatários</span>
-            <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{totalRecipients}</strong>
-            <span className="mt-1.5 block text-[13px] text-white/55">{totalCompleted} campanha(s) finalizada(s)</span>
-          </div>
-        </div>
+      <section className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(18,105,244,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(242,228,22,0.05),transparent_28%),linear-gradient(180deg,rgba(8,16,31,0.66)_0%,rgba(5,10,20,0.68)_100%)] shadow-[var(--shadow-elevated)]">
+        <AnimatePresence initial={false}>
+          {view !== 'create' && view !== 'detail' && (
+            <motion.div
+              key="campaign-metrics"
+              className="grid grid-cols-1 gap-3 p-[18px] md:grid-cols-3"
+              variants={sectionEntrance}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div
+                className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl"
+                variants={cardEntrance}
+              >
+                <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Campanhas</span>
+                <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{campaigns.length}</strong>
+                <span className="mt-1.5 block text-[13px] text-white/55">Rascunhos e disparos no mesmo painel</span>
+              </motion.div>
+              <motion.div
+                className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl"
+                variants={cardEntrance}
+              >
+                <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Em andamento</span>
+                <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{totalRunning}</strong>
+                <span className="mt-1.5 block text-[13px] text-white/55">Atualização dinâmica via realtime</span>
+              </motion.div>
+              <motion.div
+                className="rounded-[20px] border border-white/8 bg-white/5 p-[18px] backdrop-blur-xl"
+                variants={cardEntrance}
+              >
+                <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Destinatários</span>
+                <strong className="mt-2 block text-[clamp(24px,3vw,32px)] font-extrabold text-white">{totalRecipients}</strong>
+                <span className="mt-1.5 block text-[13px] text-white/55">{totalCompleted} campanha(s) finalizada(s)</span>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex flex-1 min-h-0 flex-col p-[18px]">
-          {view === 'list' && (
-            <>
-              {isLoadingCampaigns ? (
-                <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 text-white/55">
-                  <div className="h-[34px] w-[34px] animate-spin rounded-full border-[3px] border-white/15 border-t-[var(--color-secondary)]" />
-                  <span>Carregando campanhas...</span>
-                </div>
-              ) : campaigns.length === 0 ? (
-                <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 px-7 text-center">
-                  <div className="grid h-[82px] w-[82px] place-items-center rounded-full border border-white/8 bg-[radial-gradient(circle_at_30%_30%,rgba(242,228,22,0.28),transparent_55%),rgba(255,255,255,0.05)] text-white">
-                    <Radio size={34} />
+          <AnimatePresence mode="wait" initial={false}>
+            {view === 'list' && (
+              <motion.div
+                key="campaigns-list"
+                className="flex flex-1 min-h-0 flex-col"
+                variants={sectionEntrance}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {isLoadingCampaigns ? (
+                  <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 text-white/55">
+                    <div className="h-[34px] w-[34px] animate-spin rounded-full border-[3px] border-white/15 border-t-[var(--color-secondary)]" />
+                    <span>Carregando campanhas...</span>
                   </div>
-                  <h2 className="m-0 text-[28px] text-white">Nenhuma campanha criada ainda</h2>
-                  <p className="m-0 max-w-[560px] leading-7 text-white/55">
-                    Crie sua primeira campanha selecionando um WhatsApp conectado, uma lista de contatos e a mensagem
-                    que será enviada. Depois disso, você inicia o disparo quando estiver pronto.
-                  </p>
-                  <button
-                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
-                    onClick={openCreate}
-                  >
-                    <Send size={18} />
-                    Criar primeira campanha
-                  </button>
-                </div>
-              ) : (
-                <div className="scrollbar-none grid min-h-0 grid-cols-1 gap-4 overflow-auto pr-1 xl:grid-cols-2">
-                  {campaigns.map((campaign) => (
-                    <article
-                      key={campaign.id}
-                      className="relative flex min-h-[260px] flex-col gap-[18px] overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] p-[22px]"
+                ) : campaigns.length === 0 ? (
+                  <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 px-7 text-center">
+                    <div className="grid h-[82px] w-[82px] place-items-center rounded-full border border-white/8 bg-[radial-gradient(circle_at_30%_30%,rgba(242,228,22,0.28),transparent_55%),rgba(255,255,255,0.05)] text-white">
+                      <Radio size={34} />
+                    </div>
+                    <h2 className="m-0 text-[28px] text-white">Nenhuma campanha criada ainda</h2>
+                    <p className="m-0 max-w-[560px] leading-7 text-white/55">
+                      Crie sua primeira campanha selecionando um WhatsApp conectado, uma lista de contatos e a mensagem
+                      que será enviada. Depois disso, você inicia o disparo quando estiver pronto.
+                    </p>
+                    <button
+                      className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
+                      onClick={openCreate}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h2 className="m-0 text-[21px] leading-7 text-white">{campaign.nome}</h2>
-                          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] text-white/55">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                              <Radio size={12} />
-                              {campaign.whatsapp_connections?.nome || 'WhatsApp não encontrado'}
+                      <Send size={18} />
+                      Criar primeira campanha
+                    </button>
+                  </div>
+                ) : (
+                  <motion.div
+                    className="scrollbar-none grid min-h-0 grid-cols-1 gap-4 overflow-visible pr-1 xl:grid-cols-2"
+                    variants={listStagger}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    {campaigns.map((campaign) => (
+                      <motion.article
+                        key={campaign.id}
+                        className="relative flex min-h-[260px] flex-col gap-[18px] overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] p-[22px]"
+                        variants={cardEntrance}
+                        whileHover={{ y: -4, scale: 1.01 }}
+                        transition={{ duration: 0.18 }}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h2 className="m-0 text-[21px] leading-7 text-white">{campaign.nome}</h2>
+                            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] text-white/55">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                                <Radio size={12} />
+                                {campaign.whatsapp_connections?.nome || 'WhatsApp não encontrado'}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                                <ListChecks size={12} />
+                                {campaign.contatos_listas?.nome || 'Lista não encontrada'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span className={`inline-flex items-center rounded-full px-3 py-2 text-[12px] font-bold uppercase ${getStatusClasses(campaign.status)}`}>
+                            {statusLabel[campaign.status]}
+                          </span>
+                        </div>
+
+                        <p className="m-0 line-clamp-4 text-[14px] leading-7 text-white/55">{campaign.mensagem}</p>
+
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
+                            <span>{progressPercentage(campaign)}% processado</span>
+                            <span>
+                              {campaign.enviados_com_sucesso} enviados · {campaign.falhas} falhas · {campaign.pendentes} pendentes
                             </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                              <ListChecks size={12} />
-                              {campaign.contatos_listas?.nome || 'Lista não encontrada'}
-                            </span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-white/8">
+                            <div
+                              className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary-light)_0%,var(--color-secondary)_100%)]"
+                              style={{ width: `${progressPercentage(campaign)}%` }}
+                            />
                           </div>
                         </div>
 
-                        <span className={`inline-flex items-center rounded-full px-3 py-2 text-[12px] font-bold uppercase ${getStatusClasses(campaign.status)}`}>
-                          {statusLabel[campaign.status]}
+                        <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-[13px] text-white/35">{formatDate(campaign.created_at)}</span>
+                          <button
+                            className="inline-flex min-h-[42px] items-center justify-center rounded-xl bg-white/8 px-4 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/12"
+                            onClick={() => openDetail(campaign.id)}
+                          >
+                            Ver detalhes
+                          </button>
+                        </div>
+                      </motion.article>
+                    ))}
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {view === 'create' && (
+              <motion.div
+                key="campaigns-create"
+                className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]"
+                variants={sectionEntrance}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <motion.form
+                  className="flex min-h-0 max-h-full flex-col gap-[18px] overflow-hidden rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl"
+                  onSubmit={handleCreateCampaign}
+                  variants={cardEntrance}
+                >
+                  <div>
+                    <h2 className="m-0 text-[22px] text-white">Criar campanha</h2>
+                    <p className="mt-2 text-[14px] leading-6 text-white/55">
+                      Preencha por etapas para manter o fluxo mais leve e organizado.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { step: 0, title: 'Identidade', hint: 'Nome interno' },
+                      { step: 1, title: 'Origem', hint: 'WhatsApp e lista' },
+                      { step: 2, title: 'Mensagem', hint: 'Conteúdo final' },
+                    ].map((item) => {
+                      const isActive = createStep === item.step;
+
+                      return (
+                        <button
+                          key={item.step}
+                          type="button"
+                          onClick={() => setCreateStep(item.step as CreateStep)}
+                          className={`rounded-[18px] border px-4 py-3 text-left transition ${isActive
+                            ? 'border-[rgba(242,228,22,0.22)] bg-[rgba(242,228,22,0.08)]'
+                            : 'border-white/8 bg-white/4 hover:border-white/12 hover:bg-white/8'
+                            }`}
+                        >
+
+                          <strong className="block text-sm text-white">{item.title}</strong>
+                          <span className="mt-1 block text-[12px] text-white/45">{item.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="scrollbar-none min-h-0 flex-1 overflow-auto pr-1">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {createStep === 0 && (
+                        <motion.div
+                          key="create-step-0"
+                          className="grid gap-4"
+                          variants={stepPanelVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                        >
+                          <div className="rounded-[20px] border border-white/8 bg-white/4 p-4">
+                            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Etapa 1</span>
+                            <h3 className="mt-3 text-[20px] text-white">Como essa campanha será identificada?</h3>
+                            <p className="mt-2 text-sm leading-6 text-white/55">
+                              Escolha um nome claro para facilitar localização, análise de resultado e futuras reativações.
+                            </p>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <label htmlFor="campaign-name" className="text-sm font-bold text-white">
+                              Nome da campanha
+                            </label>
+                            <input
+                              id="campaign-name"
+                              className="w-full rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
+                              placeholder="Ex: Reativação de leads quentes"
+                              value={formData.nome}
+                              onChange={(event) => setFormData((current) => ({ ...current, nome: event.target.value }))}
+                              maxLength={90}
+                            />
+
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {createStep === 1 && (
+                        <motion.div
+                          key="create-step-1"
+                          className="grid gap-4"
+                          variants={stepPanelVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                        >
+                          <div className="rounded-[20px] border border-white/8 bg-white/4 p-4">
+                            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Etapa 2</span>
+                            <h3 className="mt-3 text-[20px] text-white">Defina a origem do disparo</h3>
+                            <p className="mt-2 text-sm leading-6 text-white/55">
+                              Escolha a conexão ativa e a lista de contatos que será base dessa campanha.
+                            </p>
+                          </div>
+
+                          <RefinedSelect
+                            label="WhatsApp conectado"
+                            placeholder="Selecione uma conexão ativa"
+                            value={formData.whatsapp_connection_id}
+                            selectedOption={selectedConnectionOption}
+                            onOpen={() => setPickerModal('whatsapp')}
+                          />
+
+                          <RefinedSelect
+                            label="Lista de contatos"
+                            placeholder="Escolha a lista que será usada"
+                            value={formData.lista_id}
+                            selectedOption={selectedListOption}
+                            onOpen={() => setPickerModal('lista')}
+                          />
+                        </motion.div>
+                      )}
+
+                      {createStep === 2 && (
+                        <motion.div
+                          key="create-step-2"
+                          className="grid gap-4"
+                          variants={stepPanelVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                        >
+                          <div className="rounded-[20px] border border-white/8 bg-white/4 p-4">
+                            <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Etapa 3</span>
+                            <h3 className="mt-3 text-[20px] text-white">Escreva a mensagem base</h3>
+                            <p className="mt-2 text-sm leading-6 text-white/55">
+                              Revise o conteúdo final antes de salvar. O envio começa quando você iniciar manualmente.
+                            </p>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <label htmlFor="campaign-message" className="text-sm font-bold text-white">
+                              Mensagem
+                            </label>
+                            <textarea
+                              id="campaign-message"
+                              className="min-h-[160px] w-full resize-y rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm leading-7 text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
+                              placeholder="Olá! Passando para compartilhar uma condição especial..."
+                              value={formData.mensagem}
+                              onChange={(event) => setFormData((current) => ({ ...current, mensagem: event.target.value }))}
+                              maxLength={3000}
+                            />
+                            <span className="text-[12px] text-white/45">{formData.mensagem.length}/3000 caracteres</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="mt-1 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        className="inline-flex min-h-[46px] items-center justify-center rounded-[14px] border border-white/10 bg-transparent px-4 text-sm font-semibold text-white/65 transition hover:-translate-y-0.5 hover:bg-white/10 hover:text-white"
+                        onClick={createStep === 0 ? openList : () => setCreateStep((current) => Math.max(0, current - 1) as CreateStep)}
+                      >
+                        {createStep === 0 ? 'Cancelar' : 'Voltar'}
+                      </button>
+                    </div>
+
+                    {createStep < 2 ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55 disabled:transform-none"
+                        disabled={(createStep === 0 && !canAdvanceFromStepOne) || (createStep === 1 && !canAdvanceFromStepTwo)}
+                        onClick={() => setCreateStep((current) => Math.min(2, current + 1) as CreateStep)}
+                      >
+                        Avançar
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55 disabled:transform-none"
+                        disabled={isCreating || !canSubmitCampaign}
+                      >
+                        <Send size={18} />
+                        {isCreating ? 'Criando campanha...' : 'Salvar campanha'}
+                      </button>
+                    )}
+                  </div>
+                </motion.form>
+
+                <motion.aside
+                  className="flex min-h-0 flex-col gap-[18px] rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl"
+                  variants={cardEntrance}
+                >
+                  <div>
+                    <h2 className="m-0 text-[22px] text-white">Pré-visualização</h2>
+                    <p className="mt-2 text-[14px] leading-6 text-white/55">
+                      Confira contexto, lista e mensagem antes de salvar o rascunho.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
+                    <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
+                      <strong className="block text-[15px] text-white">
+                        {selectedConnection?.nome || 'WhatsApp ainda não selecionado'}
+                      </strong>
+                      <p className="mt-2 text-[13px] leading-6 text-white/55">
+                        {selectedConnection
+                          ? `Disparo sairá por ${selectedConnection.numero || 'essa conexão ativa'}.`
+                          : 'Selecione uma conexão ativa para habilitar o disparo quando a campanha for iniciada.'}
+                      </p>
+                    </div>
+                    <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
+                      <strong className="block text-[15px] text-white">
+                        {selectedList?.nome || 'Lista ainda não selecionada'}
+                      </strong>
+                      <p className="mt-2 text-[13px] leading-6 text-white/55">
+                        {selectedList
+                          ? `A lista atual possui ${selectedList.cards?.length || 0} contato(s) vinculados.`
+                          : 'Escolha a lista de contatos que será congelada como base da campanha no momento da criação.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
+                    <span>{formData.nome.trim() || 'Novo rascunho de campanha'}</span>
+                    <span>{formData.mensagem.length} caracteres</span>
+                  </div>
+
+                  <div className="rounded-[22px_22px_22px_10px] bg-[linear-gradient(135deg,rgba(18,105,244,0.24)_0%,rgba(12,67,157,0.45)_100%)] p-[18px] text-white">
+                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-7">
+                      {formData.mensagem.trim() || 'Sua mensagem aparecerá aqui para revisão rápida antes de salvar o rascunho.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
+                    <strong className="block text-[15px] text-white">Fluxo da operação</strong>
+                    <p className="mt-2 text-[13px] leading-6 text-white/55">
+                      Primeiro você salva a campanha. Depois, na tela de detalhes, inicia o envio. A execução acontece de forma assíncrona no Nest e os contadores são atualizados via realtime.
+                    </p>
+                  </div>
+                </motion.aside>
+              </motion.div>
+            )}
+
+            {view === 'detail' && (
+              <motion.div
+                key="campaigns-detail"
+                className="scrollbar-none flex flex-1 min-h-0 flex-col overflow-auto pr-1"
+                variants={sectionEntrance}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {isLoadingDetail || !campaignDetail ? (
+                  <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 text-white/55">
+                    <div className="h-[34px] w-[34px] animate-spin rounded-full border-[3px] border-white/15 border-t-[var(--color-secondary)]" />
+                    <span>Carregando detalhes da campanha...</span>
+                  </div>
+                ) : (
+                  <motion.div
+                    className="grid min-h-0 flex-1 grid-cols-1 gap-4"
+                    variants={listStagger}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <motion.div
+                      className="flex fit-content flex-col gap-[18px] rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl"
+                      variants={cardEntrance}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h2 className="m-0 text-[22px] text-white">{campaignDetail.nome}</h2>
+                          <p className="mt-2 text-[14px] leading-6 text-white/55">
+                            Rascunho, execução e histórico concentrados em um só lugar.
+                          </p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full px-3 py-2 text-[12px] font-bold uppercase ${getStatusClasses(campaignDetail.status)}`}>
+                          {statusLabel[campaignDetail.status]}
                         </span>
                       </div>
 
-                      <p className="m-0 line-clamp-4 text-[14px] leading-7 text-white/55">{campaign.mensagem}</p>
+                      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                        {[
+                          ['Total', campaignDetail.total_contatos],
+                          ['Enviados', campaignDetail.enviados_com_sucesso],
+                          ['Falhas', campaignDetail.falhas],
+                          ['Pendentes', campaignDetail.pendentes],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-[20px] border border-white/8 bg-white/5 p-4">
+                            <span className="block text-[12px] uppercase tracking-[0.06em] text-white/35">{label}</span>
+                            <strong className="mt-2 block text-[28px] text-white">{value}</strong>
+                          </div>
+                        ))}
+                      </div>
 
                       <div className="flex flex-col gap-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
-                          <span>{progressPercentage(campaign)}% processado</span>
+                          <span>{progressPercentage(campaignDetail)}% do lote processado</span>
                           <span>
-                            {campaign.enviados_com_sucesso} enviados · {campaign.falhas} falhas · {campaign.pendentes} pendentes
+                            {campaignDetail.status === 'running'
+                              ? 'Disparo em execução assíncrona'
+                              : campaignDetail.status === 'draft'
+                                ? 'Pronta para iniciar'
+                                : 'Processamento encerrado'}
                           </span>
                         </div>
                         <div className="h-2.5 overflow-hidden rounded-full bg-white/8">
                           <div
                             className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary-light)_0%,var(--color-secondary)_100%)]"
-                            style={{ width: `${progressPercentage(campaign)}%` }}
+                            style={{ width: `${progressPercentage(campaignDetail)}%` }}
                           />
                         </div>
                       </div>
 
-                      <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
-                        <span className="text-[13px] text-white/35">{formatDate(campaign.created_at)}</span>
-                        <button
-                          className="inline-flex min-h-[42px] items-center justify-center rounded-xl bg-white/8 px-4 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/12"
-                          onClick={() => openDetail(campaign.id)}
-                        >
-                          Ver detalhes
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {view === 'create' && (
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
-              <form
-                className="flex min-h-0 flex-col gap-[18px] rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl"
-                onSubmit={handleCreateCampaign}
-              >
-                <div>
-                  <h2 className="m-0 text-[22px] text-white">Criar campanha</h2>
-                  <p className="mt-2 text-[14px] leading-6 text-white/55">
-                    Defina o nome interno, escolha um WhatsApp ativo, selecione a lista e escreva a mensagem base do disparo.
-                  </p>
-                </div>
-
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <label htmlFor="campaign-name" className="text-sm font-bold text-white">
-                      Nome da campanha
-                    </label>
-                    <input
-                      id="campaign-name"
-                      className="w-full rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
-                      placeholder="Ex: Reativação de leads quentes"
-                      value={formData.nome}
-                      onChange={(event) => setFormData((current) => ({ ...current, nome: event.target.value }))}
-                      maxLength={90}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <label htmlFor="campaign-whatsapp" className="text-sm font-bold text-white">
-                      WhatsApp conectado
-                    </label>
-                    <select
-                      id="campaign-whatsapp"
-                      className="w-full rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
-                      value={formData.whatsapp_connection_id}
-                      onChange={(event) => setFormData((current) => ({ ...current, whatsapp_connection_id: event.target.value }))}
-                    >
-                      <option value="">Selecione uma conexão ativa</option>
-                      {connectedConnections.map((connection) => (
-                        <option key={connection.id} value={connection.id}>
-                          {connection.nome}{connection.numero ? ` · ${connection.numero}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[12px] text-white/45">Somente conexões com status conectado aparecem aqui.</span>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <label htmlFor="campaign-list" className="text-sm font-bold text-white">
-                      Lista de contatos
-                    </label>
-                    <select
-                      id="campaign-list"
-                      className="w-full rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
-                      value={formData.lista_id}
-                      onChange={(event) => setFormData((current) => ({ ...current, lista_id: event.target.value }))}
-                    >
-                      <option value="">Escolha a lista que será usada</option>
-                      {lists.map((list) => (
-                        <option key={list.id} value={list.id}>
-                          {list.nome}{typeof list.cards?.length === 'number' ? ` · ${list.cards.length} contatos` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <label htmlFor="campaign-message" className="text-sm font-bold text-white">
-                      Mensagem
-                    </label>
-                    <textarea
-                      id="campaign-message"
-                      className="min-h-[200px] w-full resize-y rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm leading-7 text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
-                      placeholder="Olá! Passando para compartilhar uma condição especial..."
-                      value={formData.mensagem}
-                      onChange={(event) => setFormData((current) => ({ ...current, mensagem: event.target.value }))}
-                      maxLength={3000}
-                    />
-                    <span className="text-[12px] text-white/45">{formData.mensagem.length}/3000 caracteres</span>
-                  </div>
-                </div>
-
-                <div className="mt-1 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-[14px] border border-white/10 bg-transparent px-4 text-sm font-semibold text-white/65 transition hover:-translate-y-0.5 hover:bg-white/10 hover:text-white"
-                    onClick={openList}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55 disabled:transform-none"
-                    disabled={isCreating}
-                  >
-                    <Send size={18} />
-                    {isCreating ? 'Criando campanha...' : 'Salvar campanha'}
-                  </button>
-                </div>
-              </form>
-
-              <aside className="flex min-h-0 flex-col gap-[18px] rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl">
-                <div>
-                  <h2 className="m-0 text-[22px] text-white">Pré-visualização</h2>
-                  <p className="mt-2 text-[14px] leading-6 text-white/55">
-                    Confira contexto, lista e mensagem antes de salvar o rascunho.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                    <strong className="block text-[15px] text-white">
-                      {selectedConnection?.nome || 'WhatsApp ainda não selecionado'}
-                    </strong>
-                    <p className="mt-2 text-[13px] leading-6 text-white/55">
-                      {selectedConnection
-                        ? `Disparo sairá por ${selectedConnection.numero || 'essa conexão ativa'}.`
-                        : 'Selecione uma conexão ativa para habilitar o disparo quando a campanha for iniciada.'}
-                    </p>
-                  </div>
-                  <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                    <strong className="block text-[15px] text-white">
-                      {selectedList?.nome || 'Lista ainda não selecionada'}
-                    </strong>
-                    <p className="mt-2 text-[13px] leading-6 text-white/55">
-                      {selectedList
-                        ? `A lista atual possui ${selectedList.cards?.length || 0} contato(s) vinculados.`
-                        : 'Escolha a lista de contatos que será congelada como base da campanha no momento da criação.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
-                  <span>{formData.nome.trim() || 'Novo rascunho de campanha'}</span>
-                  <span>{formData.mensagem.length} caracteres</span>
-                </div>
-
-                <div className="rounded-[22px_22px_22px_10px] bg-[linear-gradient(135deg,rgba(18,105,244,0.24)_0%,rgba(12,67,157,0.45)_100%)] p-[18px] text-white">
-                  <p className="m-0 whitespace-pre-wrap break-words text-sm leading-7">
-                    {formData.mensagem.trim() || 'Sua mensagem aparecerá aqui para revisão rápida antes de salvar o rascunho.'}
-                  </p>
-                </div>
-
-                <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                  <strong className="block text-[15px] text-white">Fluxo da operação</strong>
-                  <p className="mt-2 text-[13px] leading-6 text-white/55">
-                    Primeiro você salva a campanha. Depois, na tela de detalhes, inicia o envio. A execução acontece de forma assíncrona no Nest e os contadores são atualizados via realtime.
-                  </p>
-                </div>
-              </aside>
-            </div>
-          )}
-
-          {view === 'detail' && (
-            <>
-              {isLoadingDetail || !campaignDetail ? (
-                <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 text-white/55">
-                  <div className="h-[34px] w-[34px] animate-spin rounded-full border-[3px] border-white/15 border-t-[var(--color-secondary)]" />
-                  <span>Carregando detalhes da campanha...</span>
-                </div>
-              ) : (
-                <div className="grid min-h-0 flex-1 grid-cols-1 gap-4">
-                  <div className="flex min-h-0 flex-col gap-[18px] rounded-[24px] border border-white/8 bg-white/5 p-[22px] backdrop-blur-xl">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h2 className="m-0 text-[22px] text-white">{campaignDetail.nome}</h2>
-                        <p className="mt-2 text-[14px] leading-6 text-white/55">
-                          Rascunho, execução e histórico concentrados em um só lugar.
-                        </p>
-                      </div>
-                      <span className={`inline-flex items-center rounded-full px-3 py-2 text-[12px] font-bold uppercase ${getStatusClasses(campaignDetail.status)}`}>
-                        {statusLabel[campaignDetail.status]}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                      {[
-                        ['Total', campaignDetail.total_contatos],
-                        ['Enviados', campaignDetail.enviados_com_sucesso],
-                        ['Falhas', campaignDetail.falhas],
-                        ['Pendentes', campaignDetail.pendentes],
-                      ].map(([label, value]) => (
-                        <div key={label} className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                          <span className="block text-[12px] uppercase tracking-[0.06em] text-white/35">{label}</span>
-                          <strong className="mt-2 block text-[28px] text-white">{value}</strong>
+                      {campaignDetail.last_error && (
+                        <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
+                          <strong className="block text-[15px] text-white">Último retorno</strong>
+                          <p className="mt-2 text-[13px] leading-6 text-white/55">{campaignDetail.last_error}</p>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </motion.div>
 
-                    <div className="flex flex-col gap-2.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
-                        <span>{progressPercentage(campaignDetail)}% do lote processado</span>
-                        <span>
-                          {campaignDetail.status === 'running'
-                            ? 'Disparo em execução assíncrona'
-                            : campaignDetail.status === 'draft'
-                              ? 'Pronta para iniciar'
-                              : 'Processamento encerrado'}
+                    <motion.div
+                      className="w-full rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
+                      variants={cardEntrance}
+                    >
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="m-0 text-[18px] text-white">Ação principal</h3>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                          <CheckCircle2 size={12} />
+                          Processo assíncrono
                         </span>
                       </div>
-                      <div className="h-2.5 overflow-hidden rounded-full bg-white/8">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary-light)_0%,var(--color-secondary)_100%)]"
-                          style={{ width: `${progressPercentage(campaignDetail)}%` }}
-                        />
-                      </div>
-                    </div>
 
-                    {campaignDetail.last_error && (
-                      <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                        <strong className="block text-[15px] text-white">Último retorno</strong>
-                        <p className="mt-2 text-[13px] leading-6 text-white/55">{campaignDetail.last_error}</p>
-                      </div>
-                    )}
-                  </div>
+                      <p className="mb-4 text-[14px] leading-6 text-white/55">
+                        Após iniciar, o envio segue em segundo plano no backend. Esta tela continua recebendo os updates por realtime.
+                      </p>
 
-                  <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-                    <div className="flex min-h-0 flex-col gap-4">
-                      <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="m-0 text-[18px] text-white">Mensagem da campanha</h3>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                            <Send size={12} />
-                            Conteúdo congelado no rascunho
-                          </span>
-                        </div>
-                        <p className="m-0 whitespace-pre-wrap break-words text-sm leading-8 text-white">
-                          {campaignDetail.mensagem}
-                        </p>
-                      </div>
+                      <button
+                        className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#f7ef66_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_28px_rgba(242,228,22,0.12)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55 disabled:transform-none"
+                        onClick={handleStartCampaign}
+                        disabled={campaignDetail.status !== 'draft' || isStarting}
+                      >
+                        <Play size={18} />
+                        {campaignDetail.status === 'draft'
+                          ? isStarting
+                            ? 'Iniciando campanha...'
+                            : 'Começar campanha'
+                          : campaignDetail.status === 'running'
+                            ? 'Campanha em andamento'
+                            : 'Campanha já processada'}
+                      </button>
+                    </motion.div>
 
-                      <div className="flex min-h-0 flex-col rounded-[20px] border border-white/8 bg-white/5 p-[18px]">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="m-0 text-[18px] text-white">Destinatários</h3>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                            <Users size={12} />
-                            {campaignDetail.destinatarios.length} contatos
-                          </span>
-                        </div>
-
-                        <div className="scrollbar-none grid min-h-0 gap-3 overflow-auto pr-1">
-                          {campaignDetail.destinatarios.map((recipient) => (
-                            <div
-                              key={recipient.id}
-                              className="flex flex-col gap-3 rounded-[20px] border border-white/8 bg-white/5 p-4 md:flex-row md:items-start md:justify-between"
-                            >
-                              <div className="flex min-w-0 items-center gap-3">
-                                {recipient.avatar_url ? (
-                                  <Image
-                                    className="h-[42px] w-[42px] shrink-0 rounded-full object-cover"
-                                    src={recipient.avatar_url}
-                                    alt={recipient.nome}
-                                    width={42}
-                                    height={42}
-                                  />
-                                ) : (
-                                  <div className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-[rgba(18,105,244,0.18)] font-extrabold text-white">
-                                    {recipient.nome.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <strong className="block truncate text-sm text-white">{recipient.nome}</strong>
-                                  <span className="mt-1 block text-[13px] text-white/55">{recipient.whatsapp}</span>
-                                  {recipient.error_message && (
-                                    <span className="mt-1 block text-[12px] leading-5 text-[#ffb2b2]">
-                                      {recipient.error_message}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <span className={`inline-flex items-center rounded-full px-3 py-2 text-[11px] font-bold uppercase ${getRecipientStatusClasses(recipient.status)}`}>
-                                {recipientStatusLabel[recipient.status]}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <aside className="flex min-h-0 flex-col gap-4">
-                      <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="m-0 text-[18px] text-white">Execução</h3>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                            <Clock3 size={12} />
-                            Tempo real
-                          </span>
-                        </div>
-
-                        <div className="grid gap-3">
-                          {[
-                            ['WhatsApp', campaignDetail.whatsapp_connections?.nome || 'Não encontrado'],
-                            ['Lista', campaignDetail.contatos_listas?.nome || 'Não encontrada'],
-                            ['Criada em', formatDate(campaignDetail.created_at)],
-                            ['Iniciada em', formatDate(campaignDetail.started_at)],
-                            ['Finalizada em', campaignDetail.completed_at ? formatDate(campaignDetail.completed_at) : 'Ainda processando'],
-                          ].map(([label, value]) => (
-                            <div key={label} className="flex flex-col gap-1 border-b border-white/6 pb-3 last:border-b-0 last:pb-0">
-                              <span className="text-[13px] text-white/35">{label}</span>
-                              <strong className="text-sm leading-6 text-white">{value}</strong>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="m-0 text-[18px] text-white">Ação principal</h3>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
-                            <CheckCircle2 size={12} />
-                            Processo assíncrono
-                          </span>
-                        </div>
-
-                        <p className="mb-4 text-[14px] leading-6 text-white/55">
-                          Após iniciar, o envio segue em segundo plano no backend. Esta tela continua recebendo os updates por realtime.
-                        </p>
-
-                        <button
-                          className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#f7ef66_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_28px_rgba(242,228,22,0.12)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55 disabled:transform-none"
-                          onClick={handleStartCampaign}
-                          disabled={campaignDetail.status !== 'draft' || isStarting}
+                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+                      <div className="flex min-h-0 flex-col gap-4">
+                        <motion.div
+                          className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
+                          variants={cardEntrance}
                         >
-                          <Play size={18} />
-                          {campaignDetail.status === 'draft'
-                            ? isStarting
-                              ? 'Iniciando campanha...'
-                              : 'Começar campanha'
-                            : campaignDetail.status === 'running'
-                              ? 'Campanha em andamento'
-                              : 'Campanha já processada'}
-                        </button>
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="m-0 text-[18px] text-white">Mensagem da campanha</h3>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                              <Send size={12} />
+                              Conteúdo congelado no rascunho
+                            </span>
+                          </div>
+                          <p className="m-0 whitespace-pre-wrap break-words text-sm leading-8 text-white">
+                            {campaignDetail.mensagem}
+                          </p>
+                        </motion.div>
+
+                        <motion.div
+                          className="flex min-h-0 flex-col rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
+                          variants={cardEntrance}
+                        >
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="m-0 text-[18px] text-white">Destinatários</h3>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                              <Users size={12} />
+                              {campaignDetail.destinatarios.length} contatos
+                            </span>
+                          </div>
+
+                          <div className="scrollbar-none grid min-h-0 gap-3 overflow-auto pr-1">
+                            {campaignDetail.destinatarios.map((recipient) => (
+                              <div
+                                key={recipient.id}
+                                className="flex flex-col gap-3 rounded-[20px] border border-white/8 bg-white/5 p-4 md:flex-row md:items-start md:justify-between"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  {recipient.avatar_url ? (
+                                    <Image
+                                      className="h-[42px] w-[42px] shrink-0 rounded-full object-cover"
+                                      src={recipient.avatar_url}
+                                      alt={recipient.nome}
+                                      width={42}
+                                      height={42}
+                                    />
+                                  ) : (
+                                    <div className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-[rgba(18,105,244,0.18)] font-extrabold text-white">
+                                      {recipient.nome.charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <strong className="block truncate text-sm text-white">{recipient.nome}</strong>
+                                    <span className="mt-1 block text-[13px] text-white/55">{recipient.whatsapp}</span>
+                                    {recipient.error_message && (
+                                      <span className="mt-1 block text-[12px] leading-5 text-[#ffb2b2]">
+                                        {recipient.error_message}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <span className={`inline-flex items-center rounded-full px-3 py-2 text-[11px] font-bold uppercase ${getRecipientStatusClasses(recipient.status)}`}>
+                                  {recipientStatusLabel[recipient.status]}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
                       </div>
-                    </aside>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+
+                      <aside className="flex min-h-0 flex-col gap-4">
+                        <motion.div
+                          className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
+                          variants={cardEntrance}
+                        >
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="m-0 text-[18px] text-white">Execução</h3>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
+                              <Clock3 size={12} />
+                              Tempo real
+                            </span>
+                          </div>
+
+                          <div className="grid gap-3">
+                            {[
+                              ['WhatsApp', campaignDetail.whatsapp_connections?.nome || 'Não encontrado'],
+                              ['Lista', campaignDetail.contatos_listas?.nome || 'Não encontrada'],
+                              ['Criada em', formatDate(campaignDetail.created_at)],
+                              ['Iniciada em', formatDate(campaignDetail.started_at)],
+                              ['Finalizada em', campaignDetail.completed_at ? formatDate(campaignDetail.completed_at) : 'Ainda processando'],
+                            ].map(([label, value]) => (
+                              <div key={label} className="flex flex-col gap-1 border-b border-white/6 pb-3 last:border-b-0 last:pb-0">
+                                <span className="text-[13px] text-white/35">{label}</span>
+                                <strong className="text-sm leading-6 text-white">{value}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+
+
+                      </aside>
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
+
+      <SelectionModal
+        isOpen={pickerModal === 'whatsapp'}
+        title="Escolher WhatsApp"
+        subtitle="Selecione a conexão conectada e ativa que será usada no disparo."
+        options={connectionOptions}
+        value={formData.whatsapp_connection_id}
+        emptyMessage="Nenhuma conexão ativa encontrada."
+        onClose={() => setPickerModal(null)}
+        onSelect={(value) =>
+          setFormData((current) => ({ ...current, whatsapp_connection_id: value }))
+        }
+      />
+
+      <SelectionModal
+        isOpen={pickerModal === 'lista'}
+        title="Escolher lista"
+        subtitle="Selecione a lista de contatos que será congelada como base desta campanha."
+        options={listOptions}
+        value={formData.lista_id}
+        emptyMessage="Nenhuma lista disponível para selecionar."
+        onClose={() => setPickerModal(null)}
+        onSelect={(value) =>
+          setFormData((current) => ({ ...current, lista_id: value }))
+        }
+      />
     </motion.div>
   );
 }

@@ -9,15 +9,10 @@ import { GripVertical, Plus, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import ModalNovaLista from '@/components/contatos/ModalNovaLista';
 import ModalAdicionarContato from '@/components/contatos/ModalAdicionarContato';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiRequest } from '@/lib/api/client';
 
 const fetcher = async (url: string, uid: string) => {
-  const res = await fetch(API_URL + url, {
-    headers: { 'x-user-id': uid },
-  });
-  if (!res.ok) throw new Error('API Error');
-  return res.json();
+  return apiRequest<any[]>(url, { userId: uid });
 };
 
 // Fix definitivo do salto: card arrastando renderiza direto no document.body via portal,
@@ -147,17 +142,14 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
     setBoardData(newBoard);
 
     try {
-      await fetch(`${API_URL}/contatos/${movedCard.id}/mover`, {
+      await apiRequest(`/contatos/${movedCard.id}/mover`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId
-        },
-        body: JSON.stringify({
+        userId,
+        body: {
           sourceListId: source.droppableId,
           targetListId: destination.droppableId,
           newOrder: destination.index
-        })
+        }
       });
       // Silencioso. Não disparamos toast para não poluir, 
       // mas se der erro no catch a gente reverte.
@@ -169,24 +161,16 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
 
   const handleCreateLista = async (nome: string, cor: string) => {
     try {
-      const res = await fetch(`${API_URL}/contatos/listas`, {
+      await apiRequest('/contatos/listas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId
-        },
-        body: JSON.stringify({ nome, cor })
+        userId,
+        body: { nome, cor },
       });
-      if (res.ok) {
-        mutate();
-        toast.success("Lista criada com sucesso!");
-        onCloseNovaLista();
-      } else {
-        const error = await res.json();
-        toast.error(error.message || 'Erro ao criar lista');
-      }
+      mutate();
+      toast.success("Lista criada com sucesso!");
+      onCloseNovaLista();
     } catch (err: any) {
-      toast.error('Erro na requisição.');
+      toast.error(err instanceof Error ? err.message : 'Erro na requisição.');
     }
   };
 
@@ -195,18 +179,15 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
 
     try {
       const promises = contatoIds.map(contatoId =>
-        fetch(`${API_URL}/contatos/vincular`, {
+        apiRequest('/contatos/vincular', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': userId
-          },
-          body: JSON.stringify({ contatoId, listaId: addContatoListId.id })
-        })
+          userId,
+          body: { contatoId, listaId: addContatoListId.id },
+        }).then(() => true).catch(() => false)
       );
 
       const results = await Promise.all(promises);
-      const allOk = results.every(res => res.ok);
+      const allOk = results.every(Boolean);
 
       if (allOk) {
         mutate();
@@ -223,24 +204,15 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
 
   const handleDesvincularContato = async (contatoId: string, listaId: string) => {
     try {
-      const res = await fetch(`${API_URL}/contatos/vincular`, {
+      await apiRequest('/contatos/vincular', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId
-        },
-        body: JSON.stringify({ contatoId, listaId })
+        userId,
+        body: { contatoId, listaId },
       });
-
-      if (res.ok) {
-        mutate();
-        toast.success("Contato desvinculado com sucesso!");
-      } else {
-        const error = await res.json();
-        toast.error(error.message || 'Erro ao desvincular contato');
-      }
+      mutate();
+      toast.success("Contato desvinculado com sucesso!");
     } catch (err) {
-      toast.error('Erro na requisição.');
+      toast.error(err instanceof Error ? err.message : 'Erro na requisição.');
     }
   };
 

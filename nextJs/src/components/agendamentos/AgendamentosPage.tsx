@@ -20,6 +20,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch, apiRequest } from '@/lib/api/client';
 
 import styles from './AgendamentosPage.module.css';
 
@@ -111,10 +112,7 @@ export default function AgendamentosPage() {
       }
 
       // 2. Fetch agendamentos (Agora via backend)
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${NEXT_PUBLIC_API_URL}/agendamentos`, {
-        headers: { 'x-user-id': profileId }
-      });
+      const response = await apiFetch('/agendamentos', { userId: profileId });
 
       if (response.ok) {
         const agendamentosAPI = await response.json();
@@ -136,9 +134,7 @@ export default function AgendamentosPage() {
 
       // 3. Fetch Google Status para saber se as integrações estão ativas para este perfil
       if (initialLoading) {
-        const googleRes = await fetch(`${NEXT_PUBLIC_API_URL}/google/status`, {
-          headers: { 'x-user-id': profileId }
-        });
+        const googleRes = await apiFetch('/google/status', { userId: profileId });
         if (googleRes.ok) {
           const gStatus = await googleRes.json();
           setGoogleStatus(gStatus);
@@ -186,13 +182,10 @@ export default function AgendamentosPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${NEXT_PUBLIC_API_URL}/agendamentos/${agendamentoToDelete}`, {
+      await apiRequest(`/agendamentos/${agendamentoToDelete}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': session.user.id }
+        userId: session.user.id,
       });
-
-      if (!response.ok) throw new Error('Falha ao excluir o agendamento');
 
       setAgendamentos(prev => prev.filter(a => a.id !== agendamentoToDelete));
       toast.success('Agendamento excluído com sucesso!');
@@ -266,14 +259,10 @@ export default function AgendamentosPage() {
         status: 'pendente'
       };
 
-      const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${NEXT_PUBLIC_API_URL}/agendamentos`, {
+      const response = await apiFetch('/agendamentos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': profileId
-        },
-        body: JSON.stringify(novo)
+        userId: profileId,
+        body: novo,
       });
 
       if (!response.ok) {

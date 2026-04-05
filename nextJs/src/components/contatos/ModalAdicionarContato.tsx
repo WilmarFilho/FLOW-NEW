@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Search, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from '../atendentes/AtendentesPage.module.css';
+import { apiFetch } from '@/lib/api/client';
 
 interface ModalProps {
   onClose: () => void;
@@ -12,8 +13,6 @@ interface ModalProps {
   userId: string;
   existingIds?: string[];
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 const backdropVariants = {
   hidden: { opacity: 0 },
@@ -47,9 +46,7 @@ export default function ModalAdicionarContato({ onClose, onSubmit, listaNome, us
   useEffect(() => {
     async function loadContatos() {
       try {
-        const res = await fetch(`${API_URL}/contatos`, {
-          headers: { 'x-user-id': userId }
-        });
+        const res = await apiFetch('/contatos', { userId });
         if (res.ok) {
           const data = await res.json();
           setContatos(data);

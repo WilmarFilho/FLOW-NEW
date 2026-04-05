@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ContatosService } from './contatos.service';
 import { UserGuard } from '../common/guards/user.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Controller('contatos')
 @UseGuards(UserGuard)
@@ -8,13 +9,13 @@ export class ContatosController {
   constructor(private readonly contatosService: ContatosService) {}
 
   @Get()
-  async getAllContatos(@Headers('x-user-id') userId: string) {
+  async getAllContatos(@CurrentUserId() userId: string) {
     return this.contatosService.getAllContatos(userId);
   }
 
   @Post()
   async createContato(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() body: { nome: string; whatsapp: string }
   ) {
     return this.contatosService.createContato(userId, body);
@@ -22,7 +23,7 @@ export class ContatosController {
 
   @Post('vincular')
   async vincularContato(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() body: { contatoId: string; listaId: string }
   ) {
     return this.contatosService.vincularContato(userId, body);
@@ -30,20 +31,20 @@ export class ContatosController {
 
   @Delete('vincular')
   async desvincularContato(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() body: { contatoId: string; listaId: string }
   ) {
     return this.contatosService.desvincularContato(userId, body);
   }
 
   @Get('listas')
-  async getListas(@Headers('x-user-id') userId: string) {
+  async getListas(@CurrentUserId() userId: string) {
     return this.contatosService.getListas(userId);
   }
 
   @Post('listas')
   async createLista(
-    @Headers('x-user-id') userId: string, 
+    @CurrentUserId() userId: string, 
     @Body() body: { nome: string; cor: string }
   ) {
     return this.contatosService.createLista(userId, body);
@@ -51,7 +52,7 @@ export class ContatosController {
 
   @Put(':id/listas')
   async setContactLists(
-    @Headers('x-user-id') userId: string, 
+    @CurrentUserId() userId: string, 
     @Param('id') id: string, 
     @Body() body: { listaIds: string[] }
   ) {
@@ -60,7 +61,7 @@ export class ContatosController {
 
   @Put(':id/mover')
   async moveContact(
-    @Headers('x-user-id') userId: string, 
+    @CurrentUserId() userId: string, 
     @Param('id') id: string, 
     @Body() body: { sourceListId: string, targetListId: string, newOrder: number }
   ) {
@@ -69,7 +70,7 @@ export class ContatosController {
 
   @Delete(':id')
   async deleteContact(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Param('id') id: string
   ) {
     return this.contatosService.deleteContact(userId, id);

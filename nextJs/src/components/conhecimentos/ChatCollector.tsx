@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Paperclip, Bot, FileText, Image, FileSpreadsheet } from 'lucide-react';
+import { apiFetch } from '@/lib/api/client';
 import styles from './ConhecimentosPage.module.css';
 
 interface Message {
@@ -22,8 +23,6 @@ interface ChatCollectorProps {
   onClose: () => void;
   onStatusChange?: (status: string) => void;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ChatCollector({
   conhecimentoId,
@@ -56,12 +55,9 @@ export default function ChatCollector({
   useEffect(() => {
     const startConversation = async () => {
       try {
-        const res = await fetch(`${API_URL}/conhecimentos/${conhecimentoId}/start`, {
+        const res = await apiFetch(`/conhecimentos/${conhecimentoId}/start`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': userId,
-          },
+          userId,
         });
         const data = await res.json();
         setMessages(data.messages || []);
@@ -92,13 +88,10 @@ export default function ChatCollector({
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const res = await fetch(`${API_URL}/conhecimentos/${conhecimentoId}/messages`, {
+      const res = await apiFetch(`/conhecimentos/${conhecimentoId}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify({ content: text }),
+        userId,
+        body: { content: text },
       });
       const data = await res.json();
 
@@ -154,9 +147,9 @@ export default function ChatCollector({
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(`${API_URL}/conhecimentos/${conhecimentoId}/upload`, {
+      const res = await apiFetch(`/conhecimentos/${conhecimentoId}/upload`, {
         method: 'POST',
-        headers: { 'x-user-id': userId },
+        userId,
         body: formData,
       });
       const data = await res.json();

@@ -1,13 +1,15 @@
-import { Controller, Get, Query, Res, Headers, Delete } from '@nestjs/common';
+import { Controller, Get, Query, Res, Delete, UseGuards } from '@nestjs/common';
 import { GoogleService } from './google.service';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
+import { UserGuard } from '../common/guards/user.guard';
 
 @Controller('google')
 export class GoogleController {
   constructor(private readonly googleService: GoogleService) {}
 
   @Get('auth-url')
-  getAuthUrl(@Headers('x-user-id') userId: string) {
-    if (!userId) return { url: null };
+  @UseGuards(UserGuard)
+  getAuthUrl(@CurrentUserId() userId: string) {
     const url = this.googleService.getAuthUrl(userId);
     return { url };
   }
@@ -27,13 +29,14 @@ export class GoogleController {
   }
 
   @Get('status')
-  async getStatus(@Headers('x-user-id') userId: string) {
-    if (!userId) return { connected: false };
+  @UseGuards(UserGuard)
+  async getStatus(@CurrentUserId() userId: string) {
     return this.googleService.getGoogleStatus(userId);
   }
 
   @Delete('disconnect')
-  async disconnect(@Headers('x-user-id') userId: string) {
+  @UseGuards(UserGuard)
+  async disconnect(@CurrentUserId() userId: string) {
     return this.googleService.disconnectGoogle(userId);
   }
 }

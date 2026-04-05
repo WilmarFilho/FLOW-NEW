@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Post,
   Put,
@@ -19,6 +18,7 @@ import {
   SendMessageDto,
 } from './dto/conhecimento.dto';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Controller('conhecimentos')
 @UseGuards(AdminGuard)
@@ -28,7 +28,7 @@ export class ConhecimentosController {
 
   /** GET /conhecimentos — Lista bases do usuário */
   @Get()
-  async list(@Headers('x-user-id') userId: string) {
+  async list(@CurrentUserId() userId: string) {
     return this.service.list(userId);
   }
 
@@ -36,7 +36,7 @@ export class ConhecimentosController {
   @Get(':id')
   async getById(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
   ) {
     return this.service.getById(id, userId);
   }
@@ -44,7 +44,7 @@ export class ConhecimentosController {
   /** POST /conhecimentos — Cria nova base */
   @Post()
   async create(
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: CreateConhecimentoDto,
   ) {
     dto.user_id = userId;
@@ -55,7 +55,7 @@ export class ConhecimentosController {
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: UpdateConhecimentoDto,
   ) {
     return this.service.update(id, userId, dto);
@@ -65,7 +65,7 @@ export class ConhecimentosController {
   @Delete(':id')
   async delete(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
   ) {
     return this.service.delete(id, userId);
   }
@@ -80,7 +80,7 @@ export class ConhecimentosController {
   @Post(':id/messages')
   async sendMessage(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: SendMessageDto,
   ) {
     return this.service.sendMessage(id, userId, dto.content);
@@ -90,7 +90,7 @@ export class ConhecimentosController {
   @Post(':id/start')
   async startConversation(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
   ) {
     return this.service.startConversation(id, userId);
   }
@@ -104,7 +104,7 @@ export class ConhecimentosController {
   )
   async uploadFile(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUserId() userId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.service.processFileUpload(id, userId, file);

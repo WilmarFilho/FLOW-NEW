@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
 import {
   Plus,
@@ -13,6 +13,14 @@ import {
   Layers,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { apiRequest } from '@/lib/api/client';
+import {
+  cardEntrance,
+  listStagger,
+  overlayFade,
+  modalPop,
+  sectionEntrance,
+} from '@/lib/motion/variants';
 import ChatCollector from './ChatCollector';
 import styles from './ConhecimentosPage.module.css';
 
@@ -29,14 +37,8 @@ interface Conhecimento {
   updated_at: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 const fetchConhecimentos = async (userId: string): Promise<Conhecimento[]> => {
-  const res = await fetch(`${API_URL}/conhecimentos`, {
-    headers: { 'x-user-id': userId },
-  });
-  if (!res.ok) throw new Error('Failed to fetch');
-  return res.json();
+  return apiRequest<Conhecimento[]>('/conhecimentos', { userId });
 };
 
 const SWR_OPTIONS = {
@@ -45,24 +47,6 @@ const SWR_OPTIONS = {
 };
 
 // ─── Animation Variants ───
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.07 },
-  },
-};
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20, scale: 0.97 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: 'spring', damping: 20, stiffness: 260 },
-  },
-};
-
 export default function ConhecimentosPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -98,18 +82,14 @@ export default function ConhecimentosPage() {
     if (!newTitulo.trim() || !userId) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/conhecimentos`, {
+      const created = await apiRequest<Conhecimento>('/conhecimentos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify({
+        userId,
+        body: {
           titulo: newTitulo.trim(),
           descricao: newDescricao.trim() || undefined,
-        }),
+        },
       });
-      const created = await res.json();
       setShowCreateModal(false);
       setNewTitulo('');
       setNewDescricao('');
@@ -128,16 +108,13 @@ export default function ConhecimentosPage() {
     if (!editTarget || !userId) return;
     setIsSubmitting(true);
     try {
-      await fetch(`${API_URL}/conhecimentos/${editTarget.id}`, {
+      await apiRequest(`/conhecimentos/${editTarget.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
-        body: JSON.stringify({
+        userId,
+        body: {
           titulo: newTitulo.trim(),
           descricao: newDescricao.trim() || undefined,
-        }),
+        },
       });
       setEditTarget(null);
       setNewTitulo('');
@@ -155,9 +132,9 @@ export default function ConhecimentosPage() {
     if (!deleteTarget || !userId) return;
     setIsSubmitting(true);
     try {
-      await fetch(`${API_URL}/conhecimentos/${deleteTarget.id}`, {
+      await apiRequest(`/conhecimentos/${deleteTarget.id}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': userId },
+        userId,
       });
       setDeleteTarget(null);
       await mutate();
@@ -220,9 +197,9 @@ export default function ConhecimentosPage() {
       {/* Header */}
       <motion.div
         className={`${styles.header} ${isPageLoading ? styles.contentBlurred : ''}`}
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        variants={sectionEntrance}
+        initial="hidden"
+        animate="visible"
       >
         <div className={styles.titleArea}>
           <h1>Bases de Conhecimento</h1>
@@ -283,9 +260,9 @@ export default function ConhecimentosPage() {
             <motion.div
               key="grid"
               className={styles.grid}
-              variants={containerVariants}
+              variants={listStagger}
               initial="hidden"
-              animate="show"
+              animate="visible"
               exit={{ opacity: 0 }}
             >
           {conhecimentos.map((base) => {
@@ -294,7 +271,7 @@ export default function ConhecimentosPage() {
               <motion.div
                 key={base.id}
                 className={styles.card}
-                variants={itemVariants}
+                variants={cardEntrance}
                 layout
                 onClick={() => setChatTarget(base)}
               >
@@ -379,17 +356,18 @@ export default function ConhecimentosPage() {
         {showCreateModal && (
           <motion.div
             className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={overlayFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={() => setShowCreateModal(false)}
           >
             <motion.div
               className={styles.modalContent}
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              variants={modalPop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
               <h2>Nova Base de Conhecimento</h2>
@@ -434,17 +412,18 @@ export default function ConhecimentosPage() {
         {editTarget && (
           <motion.div
             className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={overlayFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={() => setEditTarget(null)}
           >
             <motion.div
               className={styles.modalContent}
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              variants={modalPop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
               <h2>Editar Base</h2>
@@ -487,17 +466,18 @@ export default function ConhecimentosPage() {
         {deleteTarget && (
           <motion.div
             className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            variants={overlayFade}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             onClick={() => setDeleteTarget(null)}
           >
             <motion.div
               className={styles.deleteConfirm}
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              variants={modalPop}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
               <h2>Excluir Base</h2>

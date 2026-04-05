@@ -7,12 +7,12 @@ import { supabase } from '@/lib/supabaseClient';
 import { mutate } from 'swr';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
+import { apiRequest } from '@/lib/api/client';
+import { pageEntrance, sectionEntrance } from '@/lib/motion/variants';
 
 import KanbanBoard from './KanbanBoard';
 import ListTab from './ListTab';
 import ModalNovoContato from '@/components/contatos/ModalNovoContato';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ContatosClient() {
   const [activeTab, setActiveTab] = useState<'lista' | 'kanban'>('kanban');
@@ -38,29 +38,26 @@ export default function ContatosClient() {
 
   const handleCreateContato = async (data: { nome: string; whatsapp: string }) => {
     try {
-      const res = await fetch(`${API_URL}/contatos`, {
+      await apiRequest('/contatos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId
-        },
-        body: JSON.stringify(data)
+        userId,
+        body: data,
       });
-      if (res.ok) {
-        toast.success("Contato criado com sucesso!");
-        mutate(userId ? ['/contatos', userId] : null);
-        setIsNovoContatoOpen(false);
-      } else {
-        const error = await res.json();
-        toast.error(error.message || 'Erro ao criar contato');
-      }
+      toast.success("Contato criado com sucesso!");
+      mutate(userId ? ['/contatos', userId] : null);
+      setIsNovoContatoOpen(false);
     } catch (err) {
-      toast.error('Erro ao conectar ao servidor');
+      toast.error(err instanceof Error ? err.message : 'Erro ao conectar ao servidor');
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative">
+    <motion.div
+      className="flex-1 flex flex-col min-h-0 relative"
+      variants={pageEntrance}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Page Header (estilo igual ao WhatsAppPage) */}
       <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
         <div>
@@ -122,10 +119,10 @@ export default function ContatosClient() {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
+            variants={sectionEntrance}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="w-full h-full flex flex-col"
           >
             {activeTab === 'kanban' ? (
@@ -148,6 +145,6 @@ export default function ContatosClient() {
         />,
         document.body
       )}
-    </div>
+    </motion.div>
   );
 }
