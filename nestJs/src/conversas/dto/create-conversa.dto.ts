@@ -7,6 +7,7 @@ export class CreateConversaDto {
 
 export class SendConversaMessageDto {
   content!: string;
+  reply_to_message_id?: string;
 }
 
 export class ToggleConversaAiDto {

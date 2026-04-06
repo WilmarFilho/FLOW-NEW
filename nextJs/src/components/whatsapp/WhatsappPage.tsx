@@ -105,6 +105,7 @@ export default function WhatsappPage() {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editConnection, setEditConnection] = useState<WhatsappConnection | null>(null);
+  const [reconnectConnection, setReconnectConnection] = useState<WhatsappConnection | null>(null);
   const [testConnection, setTestConnection] = useState<WhatsappConnection | null>(null);
   const [deleteConnection, setDeleteConnection] = useState<WhatsappConnection | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -155,7 +156,11 @@ export default function WhatsappPage() {
           table: 'whatsapp_connections',
         },
         (payload) => {
-          const record = (payload.new || payload.old) as { user_id?: string; id?: string } | null;
+          const record = (payload.new || payload.old) as {
+            user_id?: string;
+            id?: string;
+            deleted_at?: string | null;
+          } | null;
           if (record?.user_id && record.user_id !== userId) return;
 
           // Optimistically update SWR cache
@@ -163,6 +168,11 @@ export default function WhatsappPage() {
             if (payload.eventType === 'INSERT') {
               return [payload.new as WhatsappConnection, ...current];
             } else if (payload.eventType === 'UPDATE') {
+              if ((payload.new as { deleted_at?: string | null } | null)?.deleted_at) {
+                return current.filter(
+                  (conn) => conn.id !== ((payload.new as { id?: string } | null)?.id)
+                );
+              }
               return current.map((conn) =>
                 conn.id === (payload.new as WhatsappConnection).id
                   ? { ...conn, ...(payload.new as WhatsappConnection) }
@@ -293,6 +303,23 @@ export default function WhatsappPage() {
       } finally {
         setIsDeleting(false);
       }
+    },
+    [userId, mutateConnections]
+  );
+
+  const handleReconnect = useCallback(
+    async (conn: WhatsappConnection) => {
+      const result = await apiRequest<{ qrCode?: string | null; pairingCode?: string | null; connectionId?: string | null }>(`/whatsapp/${conn.id}/reconnect`, {
+        method: 'POST',
+        userId,
+      });
+
+      mutateConnections();
+      return {
+        qrCode: result?.qrCode || null,
+        pairingCode: result?.pairingCode || null,
+        connectionId: result?.connectionId || conn.id,
+      };
     },
     [userId, mutateConnections]
   );
@@ -446,6 +473,7 @@ export default function WhatsappPage() {
                       onEdit={(c) => setEditConnection(c)}
                       onDelete={(c) => setDeleteConnection(c)}
                       onTest={(c) => setTestConnection(c)}
+                      onReconnect={(c) => setReconnectConnection(c)}
                     />
                   </motion.div>
                 ))}
@@ -478,6 +506,28 @@ export default function WhatsappPage() {
           onSubmit={handleCreate}
           onUpdate={handleUpdate}
           onCancelConnection={handleCancelConnection}
+        />
+      )}
+
+      {/* Reconnect Modal */}
+      {reconnectConnection && (
+        <ConnectionModal
+          isOpen={true}
+          onClose={() => setReconnectConnection(null)}
+          reconnectMode
+          connection={reconnectConnection}
+          agentes={agentes}
+          conhecimentos={conhecimentos}
+          onSubmit={handleCreate}
+          onUpdate={handleUpdate}
+          onCancelConnection={handleCancelConnection}
+          onReconnect={(connectionId) =>
+            handleReconnect(
+              reconnectConnection.id === connectionId
+                ? reconnectConnection
+                : { ...reconnectConnection, id: connectionId }
+            )
+          }
         />
       )}
 

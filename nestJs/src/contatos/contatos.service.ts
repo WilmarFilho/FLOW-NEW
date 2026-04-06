@@ -7,6 +7,14 @@ export class ContatosService {
 
   constructor(private readonly supabase: SupabaseService) {}
 
+  private unwrapRelation<T>(value: T | T[] | null | undefined) {
+    if (Array.isArray(value)) {
+      return value[0] ?? null;
+    }
+
+    return value ?? null;
+  }
+
   private async getEffectiveAdminId(authId: string): Promise<string> {
     const client = this.supabase.getClient();
     const { data: profile } = await client
@@ -35,6 +43,7 @@ export class ContatosService {
       .from('contatos')
       .select('*')
       .eq('profile_id', effectiveAdminId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -47,6 +56,45 @@ export class ContatosService {
   async createContato(authId: string, payload: { nome: string; whatsapp: string }) {
     const effectiveAdminId = await this.getEffectiveAdminId(authId);
     const client = this.supabase.getClient();
+
+    const { data: existing } = await client
+      .from('contatos')
+      .select('*')
+      .eq('profile_id', effectiveAdminId)
+      .eq('whatsapp', payload.whatsapp)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (existing) {
+      return existing;
+    }
+
+    const { data: deletedExisting } = await client
+      .from('contatos')
+      .select('*')
+      .eq('profile_id', effectiveAdminId)
+      .eq('whatsapp', payload.whatsapp)
+      .not('deleted_at', 'is', null)
+      .maybeSingle();
+
+    if (deletedExisting) {
+      const { data: restored, error: restoreError } = await client
+        .from('contatos')
+        .update({
+          nome: payload.nome,
+          deleted_at: null,
+        })
+        .eq('id', deletedExisting.id)
+        .select()
+        .single();
+
+      if (restoreError) {
+        this.logger.error('Error restoring contato', restoreError);
+        throw restoreError;
+      }
+
+      return restored;
+    }
 
     const { data, error } = await client
       .from('contatos')
@@ -104,7 +152,7 @@ export class ContatosService {
     const client = this.supabase.getClient();
 
     // Verify contact belongs to user
-    const { data: contact } = await client.from('contatos').select('id').eq('id', payload.contatoId).eq('profile_id', effectiveAdminId).single();
+    const { data: contact } = await client.from('contatos').select('id').eq('id', payload.contatoId).eq('profile_id', effectiveAdminId).is('deleted_at', null).single();
     if (!contact) throw new Error('Contatos não encontrados ou sem permissão');
 
     const { error } = await client
@@ -167,7 +215,7 @@ export class ContatosService {
         contato_id,
         lista_id,
         ordem_kanban,
-        contatos:contato_id ( id, nome, whatsapp, avatar_url )
+          contatos:contato_id ( id, nome, whatsapp, avatar_url, deleted_at )
       `)
       .in('lista_id', finalLists.map(l => l.id))
       .order('ordem_kanban', { ascending: true });
@@ -180,9 +228,13 @@ export class ContatosService {
     // Map relationships to lists
     return finalLists.map(list => {
       const cards = rels
-        .filter(r => r.lista_id === list.id)
         .map(r => ({
-          ...r.contatos,
+          ...r,
+          contato: this.unwrapRelation(r.contatos),
+        }))
+        .filter(r => r.lista_id === list.id && r.contato && !r.contato.deleted_at)
+        .map(r => ({
+          ...r.contato,
           ordem_kanban: r.ordem_kanban,
         }))
         .sort((a, b) => a.ordem_kanban - b.ordem_kanban);
@@ -230,7 +282,7 @@ export class ContatosService {
     const effectiveAdminId = await this.getEffectiveAdminId(authId);
     const client = this.supabase.getClient();
     
-    const { data: contact } = await client.from('contatos').select('id').eq('id', contatoId).eq('profile_id', effectiveAdminId).single();
+    const { data: contact } = await client.from('contatos').select('id').eq('id', contatoId).eq('profile_id', effectiveAdminId).is('deleted_at', null).single();
     if (!contact) throw new Error('Contatos não encontrados ou sem permissão');
 
     await client.from('contatos_listas_rel').delete().eq('contato_id', contatoId);
@@ -249,7 +301,7 @@ export class ContatosService {
     const client = this.supabase.getClient();
     const { sourceListId, targetListId, newOrder } = payload;
     
-    const { data: contact } = await client.from('contatos').select('id').eq('id', contatoId).eq('profile_id', effectiveAdminId).single();
+    const { data: contact } = await client.from('contatos').select('id').eq('id', contatoId).eq('profile_id', effectiveAdminId).is('deleted_at', null).single();
     if (!contact) throw new Error('Contatos não encontrados ou sem permissão');
 
     if (sourceListId && sourceListId !== targetListId) {
@@ -278,7 +330,7 @@ export class ContatosService {
 
     const { error } = await client
       .from('contatos')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', contatoId)
       .eq('profile_id', effectiveAdminId);
 

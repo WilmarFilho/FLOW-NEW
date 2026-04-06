@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
-import { apiRequest } from '@/lib/api/client';
+import { apiFetch, apiRequest } from '@/lib/api/client';
 import type {
+  ConversationAssignedOption,
   ConversationFilter,
   ConversationMessage,
   ConversationOptions,
   ConversationSummary,
   GroupedConversationMessage,
   MobilePane,
+  PaginatedResponse,
 } from './types';
 
 const REFRESH_OPTIONS = {
@@ -20,6 +22,9 @@ const REFRESH_OPTIONS = {
   revalidateOnReconnect: true,
   dedupingInterval: 10_000,
 };
+
+const CONVERSATIONS_PAGE_SIZE = 25;
+const MESSAGES_PAGE_SIZE = 30;
 
 function groupMessages(messages: ConversationMessage[]): GroupedConversationMessage[] {
   const groups: GroupedConversationMessage[] = [];
@@ -56,12 +61,38 @@ function groupMessages(messages: ConversationMessage[]): GroupedConversationMess
   return groups;
 }
 
-function unwrapRelation<T>(value: T | T[] | null | undefined) {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
+function buildQuery(params: Record<string, string | number | null | undefined>) {
+  const searchParams = new URLSearchParams();
 
-  return value ?? null;
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') {
+      return;
+    }
+
+    searchParams.set(key, String(value));
+  });
+
+  const serialized = searchParams.toString();
+  return serialized ? `?${serialized}` : '';
+}
+
+function mergeConversationPages(
+  current: ConversationSummary[],
+  next: ConversationSummary[],
+) {
+  const merged = [...current];
+
+  next.forEach((conversation) => {
+    const index = merged.findIndex((item) => item.id === conversation.id);
+    if (index >= 0) {
+      merged[index] = conversation;
+      return;
+    }
+
+    merged.push(conversation);
+  });
+
+  return merged;
 }
 
 export function useConversationsPage() {
@@ -70,12 +101,25 @@ export function useConversationsPage() {
     null,
   );
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [filter, setFilter] = useState<ConversationFilter>('all');
+  const [selectedConnectionId, setSelectedConnectionId] = useState('');
+  const [selectedAssignedUserId, setSelectedAssignedUserId] = useState('');
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextConversationsOffset, setNextConversationsOffset] = useState<number | null>(0);
+  const [nextMessagesOffset, setNextMessagesOffset] = useState<number | null>(0);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState(false);
+  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -85,26 +129,19 @@ export function useConversationsPage() {
     });
   }, []);
 
-  const conversationsKey = userId ? ['conversations', userId] : null;
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setSearchDebounced(search.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
   const optionsKey = userId ? ['conversation-options', userId] : null;
   const detailKey =
     userId && selectedConversationId
       ? ['conversation-detail', selectedConversationId, userId]
       : null;
-  const messagesKey =
-    userId && selectedConversationId
-      ? ['conversation-messages', selectedConversationId, userId]
-      : null;
-
-  const {
-    data: conversations = [],
-    isLoading: isLoadingConversations,
-    mutate: mutateConversations,
-  } = useSWR<ConversationSummary[]>(
-    conversationsKey,
-    ([, uid]) => apiRequest<ConversationSummary[]>('/conversas', { userId: uid }),
-    REFRESH_OPTIONS,
-  );
 
   const { data: options, isLoading: isLoadingOptions } = useSWR<ConversationOptions>(
     optionsKey,
@@ -123,17 +160,117 @@ export function useConversationsPage() {
     REFRESH_OPTIONS,
   );
 
-  const {
-    data: messages = [],
-    isLoading: isLoadingMessages,
-    mutate: mutateMessages,
-  } = useSWR<ConversationMessage[]>(
-    messagesKey,
-    ([, conversationId, uid]) =>
-      apiRequest<ConversationMessage[]>(`/conversas/${conversationId}/messages`, {
-        userId: uid,
-      }),
-    REFRESH_OPTIONS,
+  const loadConversations = useCallback(
+    async (mode: 'append' | 'replace' = 'replace') => {
+      if (!userId) {
+        return;
+      }
+
+      const offset = mode === 'append' ? nextConversationsOffset ?? 0 : 0;
+
+      if (mode === 'append' && nextConversationsOffset === null) {
+        return;
+      }
+
+      if (mode === 'append') {
+        setIsLoadingMoreConversations(true);
+      } else {
+        setIsLoadingConversations(true);
+      }
+
+      try {
+        const response = await apiRequest<PaginatedResponse<ConversationSummary>>(
+          `/conversas${buildQuery({
+            assignedUserId: selectedAssignedUserId || undefined,
+            filter,
+            limit: CONVERSATIONS_PAGE_SIZE,
+            offset,
+            search: searchDebounced || undefined,
+            whatsappConnectionId: selectedConnectionId || undefined,
+          })}`,
+          { userId },
+        );
+
+        setConversations((current) =>
+          mode === 'append'
+            ? mergeConversationPages(current, response.items)
+            : response.items,
+        );
+        setHasMoreConversations(response.hasMore);
+        setNextConversationsOffset(response.nextOffset);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar as conversas.',
+        );
+      } finally {
+        setIsLoadingConversations(false);
+        setIsLoadingMoreConversations(false);
+      }
+    },
+    [
+      filter,
+      nextConversationsOffset,
+      searchDebounced,
+      selectedAssignedUserId,
+      selectedConnectionId,
+      userId,
+    ],
+  );
+
+  const loadMessages = useCallback(
+    async (mode: 'appendOlder' | 'replace' = 'replace') => {
+      if (!userId || !selectedConversationId) {
+        return;
+      }
+
+      const offset = mode === 'appendOlder' ? nextMessagesOffset ?? 0 : 0;
+
+      if (mode === 'appendOlder' && nextMessagesOffset === null) {
+        return;
+      }
+
+      if (mode === 'appendOlder') {
+        setIsLoadingMoreMessages(true);
+      } else {
+        setIsLoadingMessages(true);
+      }
+
+      try {
+        const response = await apiRequest<PaginatedResponse<ConversationMessage>>(
+          `/conversas/${selectedConversationId}/messages${buildQuery({
+            limit: MESSAGES_PAGE_SIZE,
+            offset,
+          })}`,
+          { userId },
+        );
+
+        setMessages((current) => {
+          if (mode === 'replace') {
+            return response.items;
+          }
+
+          const next = [...response.items, ...current];
+          return next.filter(
+            (message, index, array) =>
+              array.findIndex((item) => item.id === message.id) === index,
+          );
+        });
+        setHasMoreMessages(response.hasMore);
+        setNextMessagesOffset(response.nextOffset);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar as mensagens.',
+        );
+      } finally {
+        setIsLoadingMessages(false);
+        setIsLoadingMoreMessages(false);
+      }
+    },
+    [nextMessagesOffset, selectedConversationId, userId],
   );
 
   useEffect(() => {
@@ -141,25 +278,64 @@ export function useConversationsPage() {
       return;
     }
 
+    void loadConversations('replace');
+  }, [loadConversations, userId]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setMessages([]);
+      setHasMoreMessages(false);
+      setNextMessagesOffset(0);
+      return;
+    }
+
+    void loadMessages('replace');
+  }, [loadMessages, selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId && conversations.length > 0) {
+      setSelectedConversationId(conversations[0].id);
+    }
+  }, [conversations, selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId || !selectedConversation?.unread_count || !userId) {
+      return;
+    }
+
+    apiRequest(`/conversas/${selectedConversationId}/read`, {
+      method: 'PATCH',
+      userId,
+    })
+      .then(() => Promise.all([loadConversations('replace'), mutateSelectedConversation()]))
+      .catch(() => undefined);
+  }, [
+    loadConversations,
+    mutateSelectedConversation,
+    selectedConversation?.unread_count,
+    selectedConversationId,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
     const refreshConversations = () => {
-      void mutateConversations();
-      window.setTimeout(() => {
-        void mutateConversations();
-      }, 350);
+      void loadConversations('replace');
     };
 
-    const handleConversationChange = (
-      payload: RealtimePostgresChangesPayload<{ id?: string }>,
-    ) => {
-      const record = (payload.new || payload.old) as { id?: string } | null;
-
-      refreshConversations();
+    const refreshMessages = () => {
       if (selectedConversationId) {
+        void loadMessages('replace');
         void mutateSelectedConversation();
-      } else if (payload.eventType === 'INSERT' && record?.id) {
-        setSelectedConversationId(record.id);
-        setMobilePane('chat');
       }
+    };
+
+    const handleConversationChange = () => {
+      refreshConversations();
+      refreshMessages();
     };
 
     const handleMessageChange = (
@@ -169,27 +345,14 @@ export function useConversationsPage() {
         | { conversa_id?: string }
         | null;
 
-      if (!record?.conversa_id) {
-        refreshConversations();
-        return;
-      }
-
-      if (!selectedConversationId) {
+      if (record?.conversa_id && !selectedConversationId) {
         setSelectedConversationId(record.conversa_id);
       }
 
-      if (record.conversa_id === selectedConversationId) {
-        void mutateMessages();
-        void mutateSelectedConversation();
-      }
-
       refreshConversations();
-      window.setTimeout(() => {
-        if (record.conversa_id === selectedConversationId || !selectedConversationId) {
-          void mutateMessages();
-          void mutateSelectedConversation();
-        }
-      }, 350);
+      if (!record?.conversa_id || record.conversa_id === selectedConversationId) {
+        refreshMessages();
+      }
     };
 
     const channel = supabase
@@ -210,68 +373,12 @@ export function useConversationsPage() {
       void supabase.removeChannel(channel);
     };
   }, [
-    mutateConversations,
-    mutateMessages,
+    loadConversations,
+    loadMessages,
     mutateSelectedConversation,
     selectedConversationId,
     userId,
   ]);
-
-  useEffect(() => {
-    if (!selectedConversationId && conversations.length > 0) {
-      setSelectedConversationId(conversations[0].id);
-    }
-  }, [conversations, selectedConversationId]);
-
-  useEffect(() => {
-    if (!selectedConversationId || !selectedConversation?.unread_count || !userId) {
-      return;
-    }
-
-    apiRequest(`/conversas/${selectedConversationId}/read`, {
-      method: 'PATCH',
-      userId,
-    })
-      .then(() => Promise.all([mutateConversations(), mutateSelectedConversation()]))
-      .catch(() => undefined);
-  }, [
-    mutateConversations,
-    mutateSelectedConversation,
-    selectedConversation?.unread_count,
-    selectedConversationId,
-    userId,
-  ]);
-
-  const filteredConversations = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return conversations.filter((conversation) => {
-      const contact = unwrapRelation(conversation.contatos);
-      const matchesQuery =
-        !query ||
-        contact?.nome?.toLowerCase().includes(query) ||
-        contact?.whatsapp?.toLowerCase().includes(query) ||
-        conversation.last_message_preview?.toLowerCase().includes(query);
-
-      if (!matchesQuery) {
-        return false;
-      }
-
-      if (filter === 'mine') {
-        return conversation.assigned_user_id === userId;
-      }
-
-      if (filter === 'unread') {
-        return conversation.unread_count > 0;
-      }
-
-      if (filter === 'ai') {
-        return conversation.ai_enabled;
-      }
-
-      return true;
-    });
-  }, [conversations, filter, search, userId]);
 
   const groupedMessages = useMemo(() => groupMessages(messages), [messages]);
 
@@ -298,7 +405,7 @@ export function useConversationsPage() {
       setIsComposerOpen(false);
       setSelectedConversationId(created.id);
       setMobilePane('chat');
-      await Promise.all([mutateConversations(), mutateSelectedConversation()]);
+      await Promise.all([loadConversations('replace'), mutateSelectedConversation()]);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -310,7 +417,7 @@ export function useConversationsPage() {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, replyToMessageId?: string) => {
     if (!userId || !selectedConversationId) {
       return;
     }
@@ -321,12 +428,12 @@ export function useConversationsPage() {
       await apiRequest(`/conversas/${selectedConversationId}/messages`, {
         method: 'POST',
         userId,
-        body: { content },
+        body: { content, reply_to_message_id: replyToMessageId },
       });
 
       await Promise.all([
-        mutateMessages(),
-        mutateConversations(),
+        loadMessages('replace'),
+        loadConversations('replace'),
         mutateSelectedConversation(),
       ]);
     } catch (error) {
@@ -335,6 +442,77 @@ export function useConversationsPage() {
       );
     } finally {
       setIsSendingMessage(false);
+    }
+  };
+
+  const uploadMessageFile = async (
+    file: File,
+    options?: { caption?: string; replyToMessageId?: string },
+  ) => {
+    if (!userId || !selectedConversationId) {
+      return;
+    }
+
+    setIsSendingMessage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (options?.caption?.trim()) {
+        formData.append('caption', options.caption.trim());
+      }
+      if (options?.replyToMessageId) {
+        formData.append('reply_to_message_id', options.replyToMessageId);
+      }
+
+      const response = await apiFetch(`/conversas/${selectedConversationId}/messages/upload`, {
+        method: 'POST',
+        userId,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        throw new Error(payload?.message || 'Não foi possível enviar o arquivo.');
+      }
+
+      await Promise.all([
+        loadMessages('replace'),
+        loadConversations('replace'),
+        mutateSelectedConversation(),
+      ]);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
+      );
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  const deleteConversationMessage = async (messageId: string) => {
+    if (!userId || !selectedConversationId) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/conversas/${selectedConversationId}/messages/${messageId}`, {
+        method: 'DELETE',
+        userId,
+      });
+
+      await Promise.all([
+        loadMessages('replace'),
+        loadConversations('replace'),
+        mutateSelectedConversation(),
+      ]);
+      toast.success('Mensagem excluída.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Não foi possível excluir a mensagem.',
+      );
     }
   };
 
@@ -353,7 +531,7 @@ export function useConversationsPage() {
       });
 
       toast.success(enabled ? 'IA reativada.' : 'IA desativada para atendimento manual.');
-      await Promise.all([mutateConversations(), mutateSelectedConversation()]);
+      await Promise.all([loadConversations('replace'), mutateSelectedConversation()]);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -370,30 +548,45 @@ export function useConversationsPage() {
     setMobilePane('chat');
   };
 
+  const assignedUsers: ConversationAssignedOption[] = options?.assignedUsers ?? [];
+
   return {
-    filteredConversations,
+    assignedUsers,
+    conversations,
+    createConversation,
+    filter,
+    goBackToList: () => setMobilePane('list'),
     groupedMessages,
+    hasMoreConversations,
+    hasMoreMessages,
     isComposerOpen,
     isCreatingConversation,
     isLoadingConversation,
     isLoadingConversations,
     isLoadingMessages,
+    isLoadingMoreConversations,
+    isLoadingMoreMessages,
     isLoadingOptions,
     isSendingMessage,
     isTogglingAi,
+    loadMoreConversations: () => loadConversations('append'),
+    loadOlderMessages: () => loadMessages('appendOlder'),
     mobilePane,
     options,
     search,
-    filter,
+    selectedAssignedUserId,
+    selectedConnectionId,
     selectedConversation,
     selectedConversationId,
-    createConversation,
-    goBackToList: () => setMobilePane('list'),
     selectConversation,
     sendMessage,
+    uploadMessageFile,
+    deleteConversationMessage,
     setFilter,
     setIsComposerOpen,
     setSearch,
+    setSelectedAssignedUserId,
+    setSelectedConnectionId,
     toggleAi,
   };
 }

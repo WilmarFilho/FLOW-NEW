@@ -11,6 +11,7 @@ interface ConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   editMode?: boolean;
+  reconnectMode?: boolean;
   connection?: WhatsappConnection | null;
   agentes: { id: string; nome: string; descricao?: string }[];
   conhecimentos: { id: string; titulo: string }[];
@@ -40,6 +41,9 @@ interface ConnectionModalProps {
     },
   ) => Promise<void>;
   onCancelConnection: (connectionId: string) => Promise<void>;
+  onReconnect?: (
+    connectionId: string,
+  ) => Promise<{ qrCode?: string | null; pairingCode?: string | null; connectionId?: string | null } | null>;
 }
 
 type BusinessHours = {
@@ -99,12 +103,14 @@ export default function ConnectionModal({
   isOpen,
   onClose,
   editMode,
+  reconnectMode,
   connection,
   agentes,
   conhecimentos,
   onSubmit,
   onUpdate,
   onCancelConnection,
+  onReconnect,
 }: ConnectionModalProps) {
   const [step, setStep] = useState<ModalStep>(getInitialStep(editMode));
   const [useQR, setUseQR] = useState(true);
@@ -130,7 +136,7 @@ export default function ConnectionModal({
       return;
     }
 
-    setStep(getInitialStep(editMode));
+    setStep(reconnectMode ? 6 : getInitialStep(editMode));
     setUseQR(true);
     setNome(connection?.nome || '');
     setNumero(connection?.numero || '');
@@ -140,11 +146,52 @@ export default function ConnectionModal({
     setBusinessHours(cloneBusinessHours(connection?.business_hours));
     setQrCode(null);
     setPairingCode(null);
-    setPendingConnectionId(null);
+    setPendingConnectionId(reconnectMode ? connection?.id || null : null);
     setIsConnected(false);
-    setIsLoading(false);
+    setIsLoading(Boolean(reconnectMode));
     setError('');
-  }, [connection, editMode, isOpen]);
+  }, [connection, editMode, isOpen, reconnectMode]);
+
+  useEffect(() => {
+    if (!isOpen || !reconnectMode || !connection?.id || !onReconnect) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const runReconnect = async () => {
+      setIsLoading(true);
+      setError('');
+      setStep(6);
+      setPendingConnectionId(connection.id);
+
+      try {
+        const result = await onReconnect(connection.id);
+
+        if (cancelled) {
+          return;
+        }
+
+        setQrCode(result?.qrCode || null);
+        setPairingCode(result?.pairingCode || null);
+        setPendingConnectionId(result?.connectionId || connection.id);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Erro ao reconectar conexao.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void runReconnect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connection?.id, isOpen, onReconnect, reconnectMode]);
 
   useEffect(() => {
     if (!pendingConnectionId || step !== 6) {
@@ -185,8 +232,10 @@ export default function ConnectionModal({
 
     if (step === 6) {
       return {
-        description: 'Finalize o pareamento no WhatsApp para ativar esta conexao.',
-        title: 'Conecte seu WhatsApp',
+        description: reconnectMode
+          ? 'Escaneie o novo QR Code para reconectar esta instancia.'
+          : 'Finalize o pareamento no WhatsApp para ativar esta conexao.',
+        title: reconnectMode ? 'Reconectar WhatsApp' : 'Conecte seu WhatsApp',
       };
     }
 
@@ -215,7 +264,7 @@ export default function ConnectionModal({
       description: 'Complete os proximos passos para conectar e preparar o atendimento.',
       title: 'Configurar Conexao',
     };
-  }, [editMode, step]);
+  }, [editMode, reconnectMode, step]);
 
   const visibleSteps = editMode ? [2, 3, 4, 5] : [1, 2, 3, 4, 5];
   const businessDaysConfigured = WEEKDAY_OPTIONS.filter(
@@ -250,7 +299,7 @@ export default function ConnectionModal({
   };
 
   const handleClose = async () => {
-    if (step === 6 && pendingConnectionId && !isConnected) {
+    if (step === 6 && pendingConnectionId && !isConnected && !reconnectMode) {
       try {
         await onCancelConnection(pendingConnectionId);
       } catch {
@@ -639,6 +688,15 @@ export default function ConnectionModal({
               Abra o WhatsApp, entre em dispositivos vinculados e confirme este pareamento.
             </p>
 
+            {error && <p className={styles.formError}>{error}</p>}
+
+            {isLoading && (
+              <p className={styles.waitingText}>
+                <span className={styles.spinner} />
+                Gerando novo pareamento...
+              </p>
+            )}
+
             {qrCode && <img src={qrCode} alt="QR Code" className={styles.qrImage} />}
 
             {pairingCode && (
@@ -648,10 +706,12 @@ export default function ConnectionModal({
               </div>
             )}
 
-            <p className={styles.waitingText}>
-              <span className={styles.spinner} />
-              Aguardando conexao. Esta tela sera atualizada automaticamente.
-            </p>
+            {!isLoading && !error && (
+              <p className={styles.waitingText}>
+                <span className={styles.spinner} />
+                Aguardando conexao. Esta tela sera atualizada automaticamente.
+              </p>
+            )}
           </div>
         )}
 

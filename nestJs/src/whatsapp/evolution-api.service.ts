@@ -51,7 +51,22 @@ export class EvolutionApiService {
         return null;
       }
 
-      return (await response.json()) as T;
+      const rawText = await response.text();
+      if (!rawText) {
+        return null;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      const looksLikeJson =
+        contentType.includes('application/json') ||
+        rawText.trim().startsWith('{') ||
+        rawText.trim().startsWith('[');
+
+      if (looksLikeJson) {
+        return JSON.parse(rawText) as T;
+      }
+
+      return rawText as T;
     } catch (error) {
       this.logger.error('Evolution API request failed', error);
       return null;
@@ -65,6 +80,7 @@ export class EvolutionApiService {
   async createInstance(instanceName: string, number?: string): Promise<any> {
     const body: any = {
       instanceName,
+      groupsIgnore: true,
       integration: 'WHATSAPP-BAILEYS',
       qrcode: !number,
       webhook: {
@@ -131,16 +147,99 @@ export class EvolutionApiService {
     });
   }
 
+  async sendTextMessageWithOptions(
+    instanceName: string,
+    payload: {
+      number: string;
+      text: string;
+      quoted?: {
+        key: { id: string };
+        message: { conversation: string };
+      };
+    },
+  ): Promise<any> {
+    return this.request('POST', `/message/sendText/${instanceName}`, payload);
+  }
+
+  async sendMediaMessage(
+    instanceName: string,
+    payload: {
+      number: string;
+      media: string;
+      mediatype: string;
+      mimetype: string;
+      fileName: string;
+      caption?: string;
+      quoted?: {
+        key: { id: string };
+        message: { conversation: string };
+      };
+    },
+  ): Promise<any> {
+    return this.request('POST', `/message/sendMedia/${instanceName}`, payload);
+  }
+
+  async sendWhatsAppAudio(
+    instanceName: string,
+    payload: {
+      number: string;
+      audio: string;
+      quoted?: {
+        key: { id: string };
+        message: { conversation: string };
+      };
+    },
+  ): Promise<any> {
+    return this.request('POST', `/message/sendWhatsAppAudio/${instanceName}`, payload);
+  }
+
+  async deleteMessageForEveryone(
+    instanceName: string,
+    payload: {
+      fromMe: boolean;
+      id: string;
+      participant?: string;
+      remoteJid: string;
+    },
+  ): Promise<any> {
+    return this.request(
+      'DELETE',
+      `/chat/deleteMessageForEveryone/${instanceName}`,
+      payload,
+    );
+  }
+
+  async sendPresence(
+    instanceName: string,
+    number: string,
+    presence: 'composing' | 'paused' | 'recording',
+    delay = 1500,
+  ): Promise<any> {
+    return this.request('POST', `/chat/sendPresence/${instanceName}`, {
+      number,
+      delay,
+      presence,
+    });
+  }
+
   async getBase64FromMediaMessage(
-    connectionId: string,
+    instanceName: string,
     messagePayload: Record<string, unknown>,
+    convertToMp4 = false,
   ): Promise<any> {
     return this.request(
       'POST',
-      `/chat/getBase64FromMediaMessage/${connectionId}`,
+      `/chat/getBase64FromMediaMessage/${instanceName}`,
       {
         message: messagePayload,
+        convertToMp4,
       },
     );
+  }
+
+  async fetchProfilePictureUrl(instanceName: string, number: string): Promise<any> {
+    return this.request('POST', `/chat/fetchProfilePictureUrl/${instanceName}`, {
+      number,
+    });
   }
 }

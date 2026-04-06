@@ -94,7 +94,7 @@
 
 /* Connection Card — Solid background (glass container is behind) */
 .card {
-  background: var(--color-surface);
+  background: #ffffff18;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;

@@ -552,7 +552,7 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      <section className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(18,105,244,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(242,228,22,0.05),transparent_28%),linear-gradient(180deg,rgba(8,16,31,0.66)_0%,rgba(5,10,20,0.68)_100%)] shadow-[var(--shadow-elevated)]">
+      <section className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(18, 105, 244, 0.24),transparent_34%),radial-gradient(circle_at_top_right,rgba(242,228,22,0.05),transparent_28%),linear-gradient(180deg,rgba(8, 16, 31, 1)_0%,rgba(5, 10, 20, 1)_100%)] shadow-[var(--shadow-elevated)]">
         <AnimatePresence initial={false}>
           {view !== 'create' && view !== 'detail' && (
             <motion.div

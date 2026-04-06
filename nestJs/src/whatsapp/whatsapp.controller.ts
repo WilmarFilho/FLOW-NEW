@@ -91,6 +91,15 @@ export class WhatsappController {
     );
   }
 
+  @Post(':id/reconnect')
+  @UseGuards(AdminGuard)
+  async reconnectConnection(
+    @Param('id') id: string,
+    @CurrentUserId() userId: string,
+  ) {
+    return this.whatsappService.reconnectConnection(id, userId);
+  }
+
   /**
    * POST /whatsapp/webhook
    * Recebe eventos da Evolution API (connection.update, qrcode.updated, etc)

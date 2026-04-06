@@ -17,6 +17,7 @@ describe('WhatsappService', () => {
       update: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
       order: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: { id: 'uuid-1', instance_name: 'inst_1', status: 'connected' }, error: null }),
     };

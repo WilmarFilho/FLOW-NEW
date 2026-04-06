@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, BookOpen, Pencil, Trash2, MessageSquareText } from 'lucide-react';
+import { Bot, BookOpen, Pencil, RefreshCcw, Trash2, MessageSquareText } from 'lucide-react';
 import styles from './WhatsappPage.module.css';
 
 export interface WhatsappConnection {
@@ -18,6 +18,7 @@ export interface WhatsappConnection {
   appointment_slot_minutes?: number;
   agentes?: { id: string; nome: string; tipo_de_agente: string } | null;
   conhecimentos?: { id: string; titulo: string } | null;
+  deleted_at?: string | null;
 }
 
 interface ConnectionCardProps {
@@ -25,9 +26,16 @@ interface ConnectionCardProps {
   onEdit: (conn: WhatsappConnection) => void;
   onDelete: (conn: WhatsappConnection) => void;
   onTest: (conn: WhatsappConnection) => void;
+  onReconnect: (conn: WhatsappConnection) => void;
 }
 
-export default function ConnectionCard({ connection, onEdit, onDelete, onTest }: ConnectionCardProps) {
+export default function ConnectionCard({
+  connection,
+  onEdit,
+  onDelete,
+  onTest,
+  onReconnect,
+}: ConnectionCardProps) {
   const statusLabel = {
     connected: 'Conectado',
     connecting: 'Conectando',
@@ -101,6 +109,14 @@ export default function ConnectionCard({ connection, onEdit, onDelete, onTest }:
           disabled={connection.status !== 'connected'}
         >
           <MessageSquareText size={14} /> Testar
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onReconnect(connection)}
+          title="Reconectar"
+          disabled={connection.status === 'connecting'}
+        >
+          <RefreshCcw size={14} /> Reconectar
         </button>
         <button
           className={`${styles.actionBtn} ${styles.actionBtnDanger}`}

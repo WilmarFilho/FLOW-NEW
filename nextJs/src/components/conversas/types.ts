@@ -1,6 +1,11 @@
 export type ConversationFilter = 'all' | 'mine' | 'unread' | 'ai';
 export type MobilePane = 'list' | 'chat';
 
+export interface ConversationAssignedOption {
+  auth_id: string;
+  nome_completo: string | null;
+}
+
 export type ConversationMessageType =
   | 'text'
   | 'audio'
@@ -72,6 +77,7 @@ export interface ConversationMessage {
 export interface ConversationOptions {
   connections: ConversationConnection[];
   contacts: ConversationContact[];
+  assignedUsers: ConversationAssignedOption[];
 }
 
 export interface GroupedConversationMessage {
@@ -80,4 +86,10 @@ export interface GroupedConversationMessage {
   senderType: ConversationMessage['sender_type'];
   direction: ConversationMessage['direction'];
   createdAt: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  hasMore: boolean;
+  nextOffset: number | null;
 }

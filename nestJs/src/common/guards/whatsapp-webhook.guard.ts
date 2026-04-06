@@ -35,11 +35,13 @@ export class WhatsappWebhookGuard implements CanActivate {
 
   constructor(private readonly configService: ConfigService) { }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<WebhookRequest>();
-    const configuredApiKey = this.configService.get<string>('EVOLUTION_API_KEY');
+    const configuredApiKey = this.configService
+      .get<string>('EVOLUTION_API_KEY')
+      ?.trim();
 
-    if (!configuredApiKey?.trim()) {
+    if (!configuredApiKey) {
       this.logger.warn(
         'EVOLUTION_API_KEY não configurada. Permitindo requisição sem validação.',
       );
@@ -47,26 +49,64 @@ export class WhatsappWebhookGuard implements CanActivate {
     }
 
     const headerSecret = this.extractSecret(request);
-
-    if (!headerSecret || headerSecret !== configuredApiKey) {
-      this.logger.warn(
-        `Webhook bloqueado por API key inválida ou ausente. Recebido: ${headerSecret ? '[presente]' : '[ausente]'}.`,
-      );
-      throw new HttpException(
-        'Webhook não autorizado.',
-        HttpStatus.UNAUTHORIZED,
-      );
+    if (!headerSecret) {
+      this.logger.warn('Webhook bloqueado por API key ausente.');
+      throw new HttpException('Webhook não autorizado.', HttpStatus.UNAUTHORIZED);
     }
 
-    return true;
+    this.logger.log(
+      `Webhook auth debug: instance=${typeof request.body?.instance === 'string' ? request.body.instance : '[sem-instance]'} headerSecretPreview=${this.previewSecret(headerSecret)} headerSources=${this.describeSecretSources(request)}`,
+    );
+
+    if (headerSecret === configuredApiKey) {
+      return true;
+    }
+
+    const instanceName =
+      typeof request.body?.instance === 'string' ? request.body.instance : null;
+
+    if (instanceName) {
+      const bodyApiKey =
+        typeof request.body?.apikey === 'string'
+          ? request.body.apikey.trim()
+          : null;
+
+      if (bodyApiKey && headerSecret === bodyApiKey) {
+        this.logger.log(
+          `Webhook auth debug: aceitando apikey dinâmica da instância para ${instanceName}.`,
+        );
+        return true;
+      }
+
+      const instanceApiKey = await this.fetchInstanceApiKey(
+        instanceName,
+        configuredApiKey,
+      );
+
+      this.logger.log(
+        `Webhook auth debug: instance=${instanceName} globalPreview=${this.previewSecret(configuredApiKey)} instancePreview=${this.previewSecret(instanceApiKey)}`,
+      );
+
+      if (instanceApiKey && headerSecret === instanceApiKey) {
+        return true;
+      }
+
+      this.logger.warn(
+        `Webhook bloqueado por API key inválida. Global e instância não bateram para ${instanceName}.`,
+      );
+    } else {
+      this.logger.warn('Webhook bloqueado por API key inválida e sem instance no payload.');
+    }
+
+    throw new HttpException('Webhook não autorizado.', HttpStatus.UNAUTHORIZED);
   }
 
   private extractSecret(request: WebhookRequest) {
     const requestBody = request.body as
       | {
-        apikey?: string;
         secret?: string;
         token?: string;
+        apikey?: string;
       }
       | undefined;
     const apiKeyHeader = request.headers.apikey;
@@ -77,18 +117,6 @@ export class WhatsappWebhookGuard implements CanActivate {
     const querySecret = request.query.secret;
     const queryToken = request.query.token;
     const queryApiKey = request.query.apikey;
-
-    if (typeof requestBody?.secret === 'string') {
-      return requestBody.secret;
-    }
-
-    if (typeof requestBody?.token === 'string') {
-      return requestBody.token;
-    }
-
-    if (typeof requestBody?.apikey === 'string') {
-      return requestBody.apikey;
-    }
 
     const normalizedAuthorization = Array.isArray(authorization)
       ? authorization[0]
@@ -153,6 +181,97 @@ export class WhatsappWebhookGuard implements CanActivate {
       return queryApiKey[0];
     }
 
-    return typeof queryApiKey === 'string' ? queryApiKey : null;
+    if (typeof queryApiKey === 'string') {
+      return queryApiKey;
+    }
+
+    if (typeof requestBody?.secret === 'string') {
+      return requestBody.secret;
+    }
+
+    if (typeof requestBody?.token === 'string') {
+      return requestBody.token;
+    }
+
+    return typeof requestBody?.apikey === 'string' ? requestBody.apikey : null;
+  }
+
+  private async fetchInstanceApiKey(
+    instanceName: string,
+    configuredApiKey: string,
+  ) {
+    const baseUrl = this.configService
+      .get<string>('EVOLUTION_API_URL')
+      ?.replace(/\/+$/, '');
+
+    if (!baseUrl) {
+      return null;
+    }
+
+    try {
+      const url = `${baseUrl}/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          apikey: configuredApiKey,
+        },
+      });
+
+      this.logger.log(
+        `Webhook auth debug: fetchInstanceApiKey status=${response.status} url=${url}`,
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.warn(
+          `Webhook auth debug: fetchInstanceApiKey non-ok body=${errorText}`,
+        );
+        return null;
+      }
+
+      const payload = (await response.json()) as Array<{
+        instance?: {
+          apikey?: string;
+        };
+      }>;
+
+      this.logger.log(
+        `Webhook auth debug: fetchInstanceApiKey payloadType=${Array.isArray(payload) ? 'array' : typeof payload} payloadSize=${Array.isArray(payload) ? payload.length : 0}`,
+      );
+
+      const first = Array.isArray(payload) ? payload[0] : null;
+      return first?.instance?.apikey?.trim() || null;
+    } catch {
+      this.logger.warn('Webhook auth debug: fetchInstanceApiKey threw exception.');
+      return null;
+    }
+  }
+
+  private previewSecret(value: string | null | undefined) {
+    if (!value) {
+      return '[null]';
+    }
+
+    if (value.length <= 8) {
+      return value;
+    }
+
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  }
+
+  private describeSecretSources(request: WebhookRequest) {
+    return JSON.stringify({
+      authorization: Boolean(request.headers.authorization),
+      apiKeyHeader: Boolean(request.headers.apikey),
+      tokenHeader: Boolean(request.headers.token),
+      secretHeader: Boolean(request.headers['x-webhook-secret']),
+      evolutionHeader: Boolean(request.headers['x-evolution-secret']),
+      queryApiKey: Boolean(request.query.apikey),
+      queryToken: Boolean(request.query.token),
+      querySecret: Boolean(request.query.secret),
+      bodyApiKey: Boolean(request.body?.apikey),
+      bodyToken: Boolean(request.body?.token),
+      bodySecret: Boolean(request.body?.secret),
+    });
   }
 }

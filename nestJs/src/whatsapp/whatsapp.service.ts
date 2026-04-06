@@ -41,6 +41,7 @@ export class WhatsappService {
       .from('whatsapp_connections')
       .select('*, agentes_ia(id, nome), conhecimentos(id, titulo)')
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -167,6 +168,7 @@ export class WhatsappService {
       .update(updateData)
       .eq('id', id)
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .select()
       .single();
 
@@ -182,6 +184,45 @@ export class WhatsappService {
     return data as WhatsappConnectionRecord;
   }
 
+  async reconnectConnection(id: string, userId: string) {
+    const { data: connection, error } = await this.supabaseService
+      .getClient()
+      .from('whatsapp_connections')
+      .select('id, instance_name, numero')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .is('deleted_at', null)
+      .single();
+
+    if (error || !connection) {
+      throw new NotFoundException('Conexão não encontrada');
+    }
+
+    const connectResult = await this.evolutionApi.connectInstance(
+      connection.instance_name,
+    );
+
+    const qrCode = connectResult?.base64 || connectResult?.qrcode?.base64 || null;
+    const pairingCode =
+      connectResult?.pairingCode || connectResult?.code || null;
+
+    await this.supabaseService
+      .getClient()
+      .from('whatsapp_connections')
+      .update({
+        status: 'connecting',
+        ultima_atualizacao: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    return {
+      success: true,
+      qrCode,
+      pairingCode,
+    };
+  }
+
   /**
    * Deleta uma conexão e a instância correspondente na Evolution API
    */
@@ -193,6 +234,7 @@ export class WhatsappService {
       .select('instance_name')
       .eq('id', id)
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .single();
 
     if (fetchError || !connection) {
@@ -205,11 +247,15 @@ export class WhatsappService {
       await this.evolutionApi.deleteInstance(connection.instance_name);
     }
 
-    // Deleta no Supabase
+    // Soft delete no Supabase para preservar histórico
     const { error } = await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        status: 'disconnected',
+        ultima_atualizacao: new Date().toISOString(),
+      })
       .eq('id', id)
       .eq('user_id', userId);
 
@@ -231,6 +277,7 @@ export class WhatsappService {
       .select('instance_name, status')
       .eq('id', id)
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .single();
 
     if (error || !connection) {
