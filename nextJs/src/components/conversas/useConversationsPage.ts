@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { apiRequest } from '@/lib/api/client';
@@ -140,33 +141,68 @@ export function useConversationsPage() {
       return;
     }
 
+    const refreshConversations = () => {
+      void mutateConversations();
+      window.setTimeout(() => {
+        void mutateConversations();
+      }, 350);
+    };
+
+    const handleConversationChange = (
+      payload: RealtimePostgresChangesPayload<{ id?: string }>,
+    ) => {
+      const record = (payload.new || payload.old) as { id?: string } | null;
+
+      refreshConversations();
+      if (selectedConversationId) {
+        void mutateSelectedConversation();
+      } else if (payload.eventType === 'INSERT' && record?.id) {
+        setSelectedConversationId(record.id);
+        setMobilePane('chat');
+      }
+    };
+
+    const handleMessageChange = (
+      payload: RealtimePostgresChangesPayload<{ conversa_id?: string }>,
+    ) => {
+      const record = (payload.new || payload.old) as
+        | { conversa_id?: string }
+        | null;
+
+      if (!record?.conversa_id) {
+        refreshConversations();
+        return;
+      }
+
+      if (!selectedConversationId) {
+        setSelectedConversationId(record.conversa_id);
+      }
+
+      if (record.conversa_id === selectedConversationId) {
+        void mutateMessages();
+        void mutateSelectedConversation();
+      }
+
+      refreshConversations();
+      window.setTimeout(() => {
+        if (record.conversa_id === selectedConversationId || !selectedConversationId) {
+          void mutateMessages();
+          void mutateSelectedConversation();
+        }
+      }, 350);
+    };
+
     const channel = supabase
       .channel(`conversas-realtime-${userId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversas' },
-        () => {
-          void mutateConversations();
-          if (selectedConversationId) {
-            void mutateSelectedConversation();
-          }
-        },
+        handleConversationChange,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversas_mensagens' },
-        (payload) => {
-          const record = (payload.new || payload.old) as
-            | { conversa_id?: string }
-            | null;
-
-          if (selectedConversationId && record?.conversa_id === selectedConversationId) {
-            void mutateMessages();
-            void mutateSelectedConversation();
-          }
-
-          void mutateConversations();
-        },
+        handleMessageChange,
       )
       .subscribe();
 

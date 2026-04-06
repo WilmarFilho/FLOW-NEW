@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
+import { AdminGuard } from '../common/guards/admin.guard';
+import { WhatsappWebhookGuard } from '../common/guards/whatsapp-webhook.guard';
+import { SupabaseService } from '../supabase/supabase.service';
 
 describe('WhatsappController', () => {
   let controller: WhatsappController;
@@ -28,7 +32,25 @@ describe('WhatsappController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WhatsappController],
-      providers: [{ provide: WhatsappService, useValue: mockService }],
+      providers: [
+        { provide: WhatsappService, useValue: mockService },
+        { provide: AdminGuard, useValue: { canActivate: jest.fn(() => true) } },
+        {
+          provide: WhatsappWebhookGuard,
+          useValue: { canActivate: jest.fn(() => true) },
+        },
+        {
+          provide: SupabaseService,
+          useValue: {
+            verifyAccessToken: jest.fn(),
+            getClient: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn() },
+        },
+      ],
     }).compile();
 
     controller = module.get<WhatsappController>(WhatsappController);

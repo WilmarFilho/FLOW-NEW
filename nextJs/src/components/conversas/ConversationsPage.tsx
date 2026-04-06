@@ -8,7 +8,6 @@ import {
   CheckCheck,
   CircleOff,
   Clock3,
-  Filter,
   Image as ImageIcon,
   MessageSquarePlus,
   Mic,
@@ -230,8 +229,11 @@ function MessageGroup({ group }: { group: GroupedConversationMessage }) {
         }`}
     >
       {group.messages.map((message) => (
-        <div
+        <motion.div
           key={message.id}
+          initial={{ opacity: 0, y: 14, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
           className={`${styles.messageBubble} ${isSystem
             ? styles.messageBubbleSystem
             : isInbound
@@ -240,7 +242,7 @@ function MessageGroup({ group }: { group: GroupedConversationMessage }) {
             }`}
         >
           {renderMessageContent(message)}
-        </div>
+        </motion.div>
       ))}
       <span className={styles.messageTimestamp}>{formatFullDate(group.createdAt)}</span>
     </div>

@@ -422,7 +422,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleWhatsappWebhook(payload: any) {
-    const event = String(payload?.event || '').toLowerCase();
+    const event = this.normalizeWebhookEvent(payload?.event);
 
     if (!event.includes('messages.upsert')) {
       return { processed: false };
@@ -458,6 +458,13 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     await this.persistIncomingMessage(conversa, connection.id, incomingMessage);
 
     return { processed: true, conversaId: conversa.id };
+  }
+
+  private normalizeWebhookEvent(event: unknown) {
+    return String(event || '')
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, '.');
   }
 
   private async persistIncomingMessage(

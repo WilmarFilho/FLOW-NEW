@@ -256,13 +256,15 @@ export class WhatsappService {
   async handleWebhook(payload: any) {
     const event = payload.event;
     const instanceName = payload.instance;
+    const normalizedEvent = this.normalizeWebhookEvent(event);
 
-    this.logger.log(`Webhook received: ${event} for instance ${instanceName}`);
+    this.logger.log(
+      `Webhook received: ${event} (${normalizedEvent}) for instance ${instanceName}`,
+    );
 
     if (!instanceName) return { processed: false };
-    const normalizedEvent = String(event || '').toLowerCase();
 
-    if (normalizedEvent.includes('messages.upsert')) {
+    if (normalizedEvent === 'messages.upsert') {
       return this.conversasService.handleWhatsappWebhook(payload);
     }
 
@@ -270,9 +272,12 @@ export class WhatsappService {
     let newStatus: string | null = null;
     let phoneNumber: string | null = null;
 
-    if (event === 'connection.update') {
-      const state = payload.data?.state || payload.data?.status;
-      if (state === 'open' || state === 'connected') {
+    if (normalizedEvent === 'connection.update') {
+      const normalizedState = this.normalizeWebhookState(
+        payload.data?.state || payload.data?.status,
+      );
+
+      if (normalizedState === 'open' || normalizedState === 'connected') {
         newStatus = 'connected';
 
         // Extrai o número do WhatsApp da resposta da Evolution v2.3
@@ -285,14 +290,18 @@ export class WhatsappService {
         if (!phoneNumber && payload.data?.number) {
           phoneNumber = payload.data.number;
         }
-      } else if (state === 'close' || state === 'disconnected') {
+      } else if (
+        normalizedState === 'close' ||
+        normalizedState === 'closed' ||
+        normalizedState === 'disconnected'
+      ) {
         newStatus = 'disconnected';
-      } else if (state === 'connecting') {
+      } else if (normalizedState === 'connecting') {
         newStatus = 'connecting';
       }
     }
 
-    if (event === 'qrcode.updated') {
+    if (normalizedEvent === 'qrcode.updated') {
       newStatus = 'connecting';
     }
 
@@ -326,5 +335,19 @@ export class WhatsappService {
 
     this.logger.log(`Connection ${instanceName} status updated to ${newStatus}`);
     return { processed: true, status: newStatus, numero: phoneNumber };
+  }
+
+  private normalizeWebhookEvent(event: unknown): string {
+    return String(event || '')
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, '.');
+  }
+
+  private normalizeWebhookState(state: unknown): string {
+    return String(state || '')
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, '.');
   }
 }

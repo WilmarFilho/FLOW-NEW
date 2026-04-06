@@ -94,6 +94,36 @@ describe('WhatsappService', () => {
     }
   });
 
+  it('should handle webhook CONNECTION_UPDATE event', async () => {
+    mockSupabaseClient.eq.mockReturnThis();
+    mockSupabaseClient.update.mockReturnValue({
+      eq: jest.fn().mockResolvedValue({ error: null }),
+    });
+
+    const result = await service.handleWebhook({
+      event: 'CONNECTION_UPDATE',
+      instance: 'test_instance',
+      data: { state: 'OPEN' },
+    });
+
+    expect(result.processed).toBe(true);
+    if ('status' in result) {
+      expect(result.status).toBe('connected');
+    } else {
+      fail('Webhook em caixa alta deveria retornar um status de conexão.');
+    }
+  });
+
+  it('should delegate MESSAGES_UPSERT events to ConversasService', async () => {
+    const result = await service.handleWebhook({
+      event: 'MESSAGES_UPSERT',
+      instance: 'test_instance',
+      data: {},
+    });
+
+    expect(result).toEqual({ processed: true });
+  });
+
   it('should return processed false for unknown event', async () => {
     const result = await service.handleWebhook({
       event: 'unknown.event',

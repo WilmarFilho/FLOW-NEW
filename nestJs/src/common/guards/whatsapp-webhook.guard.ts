@@ -33,25 +33,25 @@ type WebhookRequest = Request & {
 export class WhatsappWebhookGuard implements CanActivate {
   private readonly logger = new Logger(WhatsappWebhookGuard.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<WebhookRequest>();
-    const configuredSecret =
-      this.configService.get<string>('WHATSAPP_WEBHOOK_SECRET') ||
-      this.configService.get<string>('EVOLUTION_WEBHOOK_SECRET');
+    const configuredApiKey = this.configService.get<string>('EVOLUTION_API_KEY');
 
-    if (!configuredSecret) {
-      throw new HttpException(
-        'Webhook secret não configurado.',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+    if (!configuredApiKey?.trim()) {
+      this.logger.warn(
+        'EVOLUTION_API_KEY não configurada. Permitindo requisição sem validação.',
       );
+      return true;
     }
 
     const headerSecret = this.extractSecret(request);
 
-    if (headerSecret !== configuredSecret) {
-      this.logger.warn('Webhook bloqueado por segredo inválido ou ausente.');
+    if (!headerSecret || headerSecret !== configuredApiKey) {
+      this.logger.warn(
+        `Webhook bloqueado por API key inválida ou ausente. Recebido: ${headerSecret ? '[presente]' : '[ausente]'}.`,
+      );
       throw new HttpException(
         'Webhook não autorizado.',
         HttpStatus.UNAUTHORIZED,
@@ -64,10 +64,10 @@ export class WhatsappWebhookGuard implements CanActivate {
   private extractSecret(request: WebhookRequest) {
     const requestBody = request.body as
       | {
-          apikey?: string;
-          secret?: string;
-          token?: string;
-        }
+        apikey?: string;
+        secret?: string;
+        token?: string;
+      }
       | undefined;
     const apiKeyHeader = request.headers.apikey;
     const tokenHeader = request.headers.token;
