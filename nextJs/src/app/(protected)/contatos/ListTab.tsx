@@ -3,10 +3,15 @@
 import { useState, useEffect } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { supabase } from '@/lib/supabaseClient';
-import { Phone, Search, User, Trash } from 'lucide-react';
+import { Pencil, Phone, Search, Sparkles, User, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import ModalConfirmacao from '@/components/contatos/ModalConfirmacao';
+import ContactDetailsModal from '@/components/contatos/ContactDetailsModal';
+import ContactRenameModal from '@/components/contatos/ContactRenameModal';
+import ContactQualificationModal, {
+  type ContactQualificationJob,
+} from '@/components/contatos/ContactQualificationModal';
 import { apiRequest } from '@/lib/api/client';
 
 const fetcher = async (url: string, uid: string) => {
@@ -23,8 +28,15 @@ export default function ListTab() {
   }, []);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = useState<any | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isQualificationModalOpen, setIsQualificationModalOpen] = useState(false);
+  const [isStartingQualification, setIsStartingQualification] = useState(false);
+  const [qualificationJob, setQualificationJob] = useState<ContactQualificationJob | null>(null);
+  const [selectedContactDetails, setSelectedContactDetails] = useState<any | null>(null);
+  const [isLoadingContactDetails, setIsLoadingContactDetails] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -39,6 +51,34 @@ export default function ListTab() {
   const filtered = contatos?.filter((c: any) =>
     c.nome.toLowerCase().includes(search.toLowerCase()) || c.whatsapp.includes(search)
   ) || [];
+
+  useEffect(() => {
+    if (!userId || !qualificationJob?.id || qualificationJob.status !== 'running') {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const nextJob = await apiRequest<ContactQualificationJob>(
+          `/contatos/qualificacao/automatica/${qualificationJob.id}`,
+          { userId },
+        );
+
+        setQualificationJob(nextJob);
+
+        if (nextJob.status !== 'running') {
+          globalMutate(['/contatos', userId]);
+          globalMutate(['/contatos/listas', userId]);
+          window.clearInterval(interval);
+        }
+      } catch (error) {
+        window.clearInterval(interval);
+        toast.error(error instanceof Error ? error.message : 'Erro ao acompanhar qualificação.');
+      }
+    }, 1500);
+
+    return () => window.clearInterval(interval);
+  }, [qualificationJob?.id, qualificationJob?.status, userId]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -58,10 +98,80 @@ export default function ListTab() {
     }
   };
 
+  const handleRename = async (nextName: string) => {
+    if (!renameTarget || nextName.trim() === renameTarget.nome) {
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      await apiRequest(`/contatos/${renameTarget.id}`, {
+        method: 'PATCH',
+        userId,
+        body: { nome: nextName.trim() },
+      });
+      toast.success('Nome do contato atualizado.');
+      globalMutate(['/contatos', userId]);
+      setRenameTarget(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao atualizar contato');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const handleStartQualification = async () => {
+    if (!userId) {
+      toast.error('Não foi possível identificar o usuário atual.');
+      return;
+    }
+
+    setIsStartingQualification(true);
+    try {
+      const job = await apiRequest<ContactQualificationJob>(
+        '/contatos/qualificacao/automatica',
+        {
+          method: 'POST',
+          userId,
+        },
+      );
+
+      setQualificationJob(job);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao iniciar qualificação.');
+    } finally {
+      setIsStartingQualification(false);
+    }
+  };
+
+  const handleOpenContactDetails = async (contato: any) => {
+    if (!userId) {
+      return;
+    }
+
+    setSelectedContactDetails({
+      id: contato.id,
+      nome: contato.nome,
+      whatsapp: contato.whatsapp,
+      avatar_url: contato.avatar_url || null,
+      connections: [],
+    });
+    setIsLoadingContactDetails(true);
+
+    try {
+      const details = await apiRequest(`/contatos/${contato.id}/details`, { userId });
+      setSelectedContactDetails(details);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao carregar detalhes do contato.');
+    } finally {
+      setIsLoadingContactDetails(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden p-4">
       {/* Top Bar Support */}
-      <div className="flex items-center gap-4 mb-4 flex-shrink-0">
+      <div className="mb-4 flex flex-shrink-0 flex-wrap items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
@@ -72,6 +182,17 @@ export default function ListTab() {
             className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setIsQualificationModalOpen(true)}
+          disabled={isStartingQualification || qualificationJob?.status === 'running'}
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Sparkles size={16} />
+          {qualificationJob?.status === 'running'
+            ? 'Qualificando...'
+            : 'Qualificar contatos'}
+        </button>
       </div>
 
       {/* List Container */}
@@ -88,6 +209,7 @@ export default function ListTab() {
             {filtered.map((contato: any) => (
               <div
                 key={contato.id}
+                onClick={() => void handleOpenContactDetails(contato)}
                 className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col gap-3 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-3 w-full">
@@ -105,13 +227,22 @@ export default function ListTab() {
                       <span>{contato.whatsapp}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeleteId(contato.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-white/40 hover:bg-white/10 rounded-lg transition-all"
-                    title="Excluir contato"
-                  >
-                    <Trash size={16} />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setRenameTarget(contato); }}
+                      className="p-2 text-white/40 hover:bg-white/10 rounded-lg transition-all"
+                      title="Editar nome"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(contato.id); }}
+                      className="p-2 text-white/40 hover:bg-white/10 rounded-lg transition-all"
+                      title="Excluir contato"
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -132,6 +263,43 @@ export default function ListTab() {
         />,
         document.body
       )}
+
+      <ContactRenameModal
+        isOpen={!!renameTarget}
+        initialName={renameTarget?.nome || ''}
+        subtitle={renameTarget?.whatsapp || null}
+        avatarUrl={renameTarget?.avatar_url || null}
+        loading={isRenaming}
+        onClose={() => {
+          if (!isRenaming) {
+            setRenameTarget(null);
+          }
+        }}
+        onConfirm={handleRename}
+      />
+
+      <ContactQualificationModal
+        isOpen={isQualificationModalOpen}
+        isStarting={isStartingQualification}
+        job={qualificationJob}
+        onClose={() => {
+          if (qualificationJob?.status !== 'running' && !isStartingQualification) {
+            setIsQualificationModalOpen(false);
+          }
+        }}
+        onConfirm={handleStartQualification}
+      />
+
+      <ContactDetailsModal
+        details={selectedContactDetails}
+        isLoading={isLoadingContactDetails}
+        isOpen={!!selectedContactDetails}
+        onClose={() => {
+          if (!isLoadingContactDetails) {
+            setSelectedContactDetails(null);
+          }
+        }}
+      />
     </div>
   );
 }

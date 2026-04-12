@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LogsService } from '../logs/logs.service';
 
 @Injectable()
 export class EvolutionApiService {
@@ -9,7 +10,10 @@ export class EvolutionApiService {
   private readonly webhookBaseUrl: string;
   private readonly webhookSecret: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly logsService: LogsService,
+  ) {
     this.baseUrl = (this.configService.get<string>('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
     this.apiKey = this.configService.get<string>('EVOLUTION_API_KEY') || '';
     this.webhookBaseUrl = (this.configService.get<string>('WEBHOOK_BASE_URL') || '').replace(/\/+$/, '');
@@ -20,9 +24,19 @@ export class EvolutionApiService {
 
     if (!this.baseUrl || !this.apiKey) {
       this.logger.warn('Evolution API URL ou API Key não configuradas no .env');
+      void this.logsService.warn({
+        action: 'whatsapp.evolution.config',
+        context: EvolutionApiService.name,
+        message: 'Evolution API URL ou API Key não configuradas no .env',
+      });
     }
     if (!this.webhookBaseUrl) {
       this.logger.warn('WEBHOOK_BASE_URL não configurada no .env');
+      void this.logsService.warn({
+        action: 'whatsapp.evolution.config',
+        context: EvolutionApiService.name,
+        message: 'WEBHOOK_BASE_URL não configurada no .env',
+      });
     }
   }
 
@@ -48,6 +62,12 @@ export class EvolutionApiService {
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(`Evolution API error ${response.status}: ${errorText}`);
+        await this.logsService.error({
+          action: `whatsapp.evolution.${method.toLowerCase()}`,
+          context: EvolutionApiService.name,
+          message: `Evolution API error ${response.status}: ${errorText}`,
+          metadata: { path, status: response.status },
+        });
         return null;
       }
 
@@ -69,6 +89,13 @@ export class EvolutionApiService {
       return rawText as T;
     } catch (error) {
       this.logger.error('Evolution API request failed', error);
+      await this.logsService.error({
+        action: `whatsapp.evolution.${method.toLowerCase()}`,
+        context: EvolutionApiService.name,
+        error,
+        message: 'Evolution API request failed',
+        metadata: { path },
+      });
       return null;
     }
   }

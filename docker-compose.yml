@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./nextJs
+      dockerfile: Dockerfile
+    container_name: flow-frontend
+    restart: unless-stopped
+    ports:
+      - "3021:3000"
+    env_file:
+      - .env
+
+  backend:
+    build:
+      context: ./nestJs
+      dockerfile: Dockerfile
+    container_name: flow-backend
+    restart: unless-stopped
+    ports:
+      - "3022:3000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+
+  evolution:
+    image: atendai/evolution-api:v2.3.7
+    container_name: flow-evolution
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env
+    environment:
+      - SERVER_PORT=8080
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379/1
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=false
+      - CACHE_LOCAL_ENABLED=false
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://flowuser:flowpass@postgres:5432/flowevolution?schema=public
+      - RABBITMQ_ENABLED=false
+      - WEBSOCKET_ENABLED=false
+    depends_on:
+      - postgres
+      - redis
+    command: ["node", "./dist/src/main.js"]
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: flow-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=flowuser
+      - POSTGRES_PASSWORD=flowpass
+      - POSTGRES_DB=flowevolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: flow-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:

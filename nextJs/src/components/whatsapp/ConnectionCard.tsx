@@ -6,8 +6,9 @@ import styles from './WhatsappPage.module.css';
 export interface WhatsappConnection {
   id: string;
   nome: string;
+  cor?: string | null;
   numero: string;
-  status: 'connected' | 'disconnected' | 'connecting';
+  status: 'connected' | 'disconnected' | 'connecting' | 'deleted';
   instance_name: string;
   agente_id: string | null;
   conhecimento_id: string | null;
@@ -40,28 +41,44 @@ export default function ConnectionCard({
     connected: 'Conectado',
     connecting: 'Conectando',
     disconnected: 'Desconectado',
-  }[connection.status];
+    deleted: 'Excluída',
+  }[connection.deleted_at ? 'deleted' : connection.status];
 
   const statusClass = {
     connected: styles.statusConnected,
     connecting: styles.statusConnecting,
     disconnected: styles.statusDisconnected,
-  }[connection.status];
+    deleted: styles.statusDisconnected,
+  }[connection.deleted_at ? 'deleted' : connection.status];
 
   const cardClass = {
     connected: styles.cardConnected,
     connecting: styles.cardConnecting,
     disconnected: styles.cardDisconnected,
-  }[connection.status];
+    deleted: styles.cardDisconnected,
+  }[connection.deleted_at ? 'deleted' : connection.status];
   const businessDays = Object.entries(connection.business_hours?.days || {}).filter(
     ([, windows]) => Array.isArray(windows) && windows.length > 0,
   ).length;
+  const isDeleted = Boolean(connection.deleted_at);
 
   return (
     <div className={`${styles.card} ${cardClass}`}>
       <div className={styles.cardHeader}>
         <div>
-          <h3 className={styles.cardName}>{connection.nome}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '999px',
+                backgroundColor: connection.cor || '#22c55e',
+                boxShadow: '0 0 0 3px rgba(255,255,255,0.06)',
+                flexShrink: 0,
+              }}
+            />
+            <h3 className={styles.cardName}>{connection.nome}</h3>
+          </div>
           <p className={styles.cardNumber}>
             {connection.numero || 'Número não definido'}
           </p>
@@ -98,34 +115,36 @@ export default function ConnectionCard({
         </div>
       </div>
 
-      <div className={styles.cardActions}>
-        <button className={styles.actionBtn} onClick={() => onEdit(connection)} title="Editar">
-          <Pencil size={14} /> Editar
-        </button>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnTest}`}
-          onClick={() => onTest(connection)}
-          title="Testar"
-          disabled={connection.status !== 'connected'}
-        >
-          <MessageSquareText size={14} /> Testar
-        </button>
-        <button
-          className={styles.actionBtn}
-          onClick={() => onReconnect(connection)}
-          title="Reconectar"
-          disabled={connection.status === 'connecting'}
-        >
-          <RefreshCcw size={14} /> Reconectar
-        </button>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-          onClick={() => onDelete(connection)}
-          title="Excluir"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
+      {!isDeleted ? (
+        <div className={styles.cardActions}>
+          <button className={styles.actionBtn} onClick={() => onEdit(connection)} title="Editar">
+            <Pencil size={14} /> Editar
+          </button>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnTest}`}
+            onClick={() => onTest(connection)}
+            title="Testar"
+            disabled={connection.status !== 'connected'}
+          >
+            <MessageSquareText size={14} /> Testar
+          </button>
+          <button
+            className={styles.actionBtn}
+            onClick={() => onReconnect(connection)}
+            title="Reconectar"
+            disabled={connection.status === 'connecting'}
+          >
+            <RefreshCcw size={14} /> Reconectar
+          </button>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+            onClick={() => onDelete(connection)}
+            title="Excluir"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

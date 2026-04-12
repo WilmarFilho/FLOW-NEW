@@ -30,20 +30,35 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : null;
 
-    // Log the error to Supabase via the background
-    this.logsService.createLog({
-      level: status >= 500 ? 'error' : 'warn',
-      action: `HTTP ${request.method} ${request.url}`,
-      message: message,
-      metadata: {
-        statusCode: status,
-        path: request.url,
-        body: request.body,
-        query: request.query,
-        exceptionResponse,
-        stack: exception instanceof Error ? exception.stack : null,
-      },
-    });
+    if (status >= 500) {
+      await this.logsService.error({
+        action: `HTTP ${request.method} ${request.url}`,
+        context: AllExceptionsFilter.name,
+        error: exception,
+        message,
+        metadata: {
+          statusCode: status,
+          path: request.url,
+          body: request.body,
+          query: request.query,
+          exceptionResponse,
+        },
+      });
+    } else {
+      await this.logsService.warn({
+        action: `HTTP ${request.method} ${request.url}`,
+        context: AllExceptionsFilter.name,
+        error: exception,
+        message,
+        metadata: {
+          statusCode: status,
+          path: request.url,
+          body: request.body,
+          query: request.query,
+          exceptionResponse,
+        },
+      });
+    }
 
     response.status(status).json({
       statusCode: status,

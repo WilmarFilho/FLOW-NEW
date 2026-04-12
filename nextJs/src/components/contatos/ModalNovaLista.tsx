@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Type, Palette } from 'lucide-react';
+import { X, Type, Palette, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from '../atendentes/AtendentesPage.module.css';
 
 interface ModalProps {
   onClose: () => void;
-  onSubmit: (nome: string, cor: string) => Promise<void>;
+  onSubmit: (nome: string, cor: string, descricao: string) => Promise<void>;
 }
 
 const coresHex = ["#3b82f6", "#f97316", "#22c55e", "#ef4444", "#a855f7", "#ec4899", "#14b8a6"];
@@ -36,6 +36,7 @@ const modalVariants = {
 
 export default function ModalNovaLista({ onClose, onSubmit }: ModalProps) {
   const [nome, setNome] = useState('');
+  const [descricao, setDescricao] = useState('');
   const [cor, setCor] = useState(coresHex[0]);
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +44,7 @@ export default function ModalNovaLista({ onClose, onSubmit }: ModalProps) {
     e.preventDefault();
     if (!nome.trim()) return;
     setLoading(true);
-    await onSubmit(nome.trim(), cor);
+    await onSubmit(nome.trim(), cor, descricao.trim());
     setLoading(false);
   };
 
@@ -107,6 +108,22 @@ export default function ModalNovaLista({ onClose, onSubmit }: ModalProps) {
                     />
                   ))}
                 </div>
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Descrição da Lista</label>
+              <div style={{ position: 'relative' }}>
+                <FileText size={16} style={{ position: 'absolute', left: 14, top: 14, opacity: 0.4 }} />
+                <textarea
+                  maxLength={220}
+                  placeholder="Ex: Lista para contatos que pediram reunião, proposta ou demonstraram intenção clara de avançar."
+                  className={styles.formInput}
+                  style={{ paddingLeft: 42, minHeight: 110, resize: 'vertical', paddingTop: 14 }}
+                  value={descricao}
+                  onChange={e => setDescricao(e.target.value)}
+                  disabled={loading}
+                />
               </div>
             </div>
 

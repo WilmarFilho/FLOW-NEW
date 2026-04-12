@@ -77,7 +77,7 @@ export default function ModalAdicionarContato({ onClose, onSubmit, listaNome, us
   const filtered = contatos.filter(c => {
     if (existingIds.includes(c.id)) return false;
     return c.nome.toLowerCase().includes(search.toLowerCase()) ||
-           c.whatsapp.includes(search);
+      c.whatsapp.includes(search);
   }).slice(0, 10); // Show max 10 for performance in dropdown
 
   return (
@@ -122,7 +122,7 @@ export default function ModalAdicionarContato({ onClose, onSubmit, listaNome, us
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10" style={{ padding: '12px 0' }}>
+            <div className="flex-1 overflow-y-auto pr-1 scrollbar-none scrollbar-thumb-white/10" style={{ padding: '12px 0' }}>
               {loadingContacts ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.4)' }}>
                   <div className="w-8 h-8 border-2 border-primary border-t-transparent flex-shrink-0 animate-spin rounded-full mb-4" />

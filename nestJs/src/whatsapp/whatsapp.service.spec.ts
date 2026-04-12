@@ -19,6 +19,7 @@ describe('WhatsappService', () => {
       eq: jest.fn().mockReturnThis(),
       is: jest.fn().mockReturnThis(),
       order: jest.fn().mockReturnThis(),
+      then: jest.fn((resolve) => resolve({ data: [{ id: '1', nome: 'Test' }], error: null })),
       single: jest.fn().mockResolvedValue({ data: { id: 'uuid-1', instance_name: 'inst_1', status: 'connected' }, error: null }),
     };
 
@@ -46,6 +47,9 @@ describe('WhatsappService', () => {
           provide: LogsService,
           useValue: {
             createLog: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            info: jest.fn(),
           },
         },
         {
@@ -65,11 +69,6 @@ describe('WhatsappService', () => {
   });
 
   it('should list connections for a user', async () => {
-    mockSupabaseClient.order.mockResolvedValue({
-      data: [{ id: '1', nome: 'Test' }],
-      error: null,
-    });
-
     const result = await service.listConnections('user-1');
     expect(result).toBeDefined();
     expect(mockSupabaseClient.from).toHaveBeenCalledWith('whatsapp_connections');

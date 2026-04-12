@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ContatosService } from './contatos.service';
 import { UserGuard } from '../common/guards/user.guard';
 import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
@@ -19,6 +19,23 @@ export class ContatosController {
     @Body() body: { nome: string; whatsapp: string }
   ) {
     return this.contatosService.createContato(userId, body);
+  }
+
+  @Patch(':id')
+  async updateContato(
+    @CurrentUserId() userId: string,
+    @Param('id') id: string,
+    @Body() body: { nome: string },
+  ) {
+    return this.contatosService.updateContato(userId, id, body);
+  }
+
+  @Get(':id/details')
+  async getContatoDetails(
+    @CurrentUserId() userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contatosService.getContatoDetails(userId, id);
   }
 
   @Post('vincular')
@@ -45,9 +62,30 @@ export class ContatosController {
   @Post('listas')
   async createLista(
     @CurrentUserId() userId: string, 
-    @Body() body: { nome: string; cor: string }
+    @Body() body: { nome: string; cor: string; descricao?: string | null }
   ) {
     return this.contatosService.createLista(userId, body);
+  }
+
+  @Post('qualificacao/automatica')
+  async startAutomaticQualification(@CurrentUserId() userId: string) {
+    return this.contatosService.startAutomaticQualification(userId);
+  }
+
+  @Get('qualificacao/automatica/:jobId')
+  async getAutomaticQualificationStatus(
+    @CurrentUserId() userId: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.contatosService.getAutomaticQualificationStatus(userId, jobId);
+  }
+
+  @Delete('listas/:id')
+  async deleteLista(
+    @CurrentUserId() userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.contatosService.deleteLista(userId, id);
   }
 
   @Put(':id/listas')

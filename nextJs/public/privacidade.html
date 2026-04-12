@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade | FLOW</title>
+  <meta name="description" content="Política de Privacidade e uso de dados da plataforma FLOW." />
+</head>
+<body style="min-height:100vh;background-color:#09090b;color:#fafafa;font-family:system-ui,-apple-system,sans-serif;padding:4rem 2rem;display:flex;flex-direction:column;align-items:center;margin:0;">
+
+  <header style="text-align:center;margin-bottom:3rem;max-width:800px;width:100%;">
+    <h1 style="font-size:2.5rem;font-weight:700;background:linear-gradient(90deg,#fafafa,#a1a1aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.5rem;">Política de Privacidade</h1>
+    <p style="color:#a1a1aa;font-size:1rem;">Como coletamos, utilizamos e protegemos seus dados.</p>
+  </header>
+
+  <main style="max-width:800px;width:100%;background-color:rgba(24,24,27,0.4);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:3rem;backdrop-filter:blur(10px);">
+
+    <section style="margin-bottom:2.5rem;line-height:1.6;">
+      <h2 style="font-size:1.2rem;font-weight:600;color:#fafafa;margin-bottom:0.75rem;">1. Coleta de Informações</h2>
+      <p style="color:#a1a1aa;">
+        Coletamos informações que você nos fornece diretamente, como nome, e-mail e dados de perfil durante o cadastro.
+        No caso das autorizações OAUTH (como o Google), nós requisitamos apenas os tokens necessários para operar nas permissões
+        as quais o usuário explicitamente consentiu (ver e criar eventos no calendário).
+      </p>
+    </section>
+
+    <section style="margin-bottom:2.5rem;line-height:1.6;">
+      <h2 style="font-size:1.2rem;font-weight:600;color:#fafafa;margin-bottom:0.75rem;">2. Uso das Informações Obtidas</h2>
+      <p style="color:#a1a1aa;">As informações coletadas e os Tokens de Terceiros (ex: Google Calendar API) são estritamente usados para:</p>
+      <ul style="padding-left:1.5rem;margin-top:0.5rem;color:#a1a1aa;">
+        <li style="margin-bottom:0.4rem;line-height:1.6;">Criar agendamentos na sua agenda em seu nome quando você finaliza uma marcação no painel.</li>
+        <li style="margin-bottom:0.4rem;line-height:1.6;">Ler seus agendamentos para evitar conflitos ou marcações duplas.</li>
+        <li style="margin-bottom:0.4rem;line-height:1.6;">Comunicações oficiais do sistema, caso tenha emitido faturas.</li>
+      </ul>
+    </section>
+
+    <section style="margin-bottom:2.5rem;line-height:1.6;">
+      <h2 style="font-size:1.2rem;font-weight:600;color:#fafafa;margin-bottom:0.75rem;">3. O Que Não Fazemos (Uso restrito da API do Google)</h2>
+      <p style="color:#a1a1aa;">
+        Em conformidade com a Política de Dados do Usuário dos Serviços de API do Google, garantimos que os dados recebidos das APIs do Google
+        não serão utilizados para desenvolver, treinar, melhorar ou alimentar inteligência artificial em modelos de LLM.
+        Nenhum dado é lido do calendário particular de usuários para ensinar IAs da nossa plataforma.
+        As conexões do calendário são isoladas por conta.
+      </p>
+    </section>
+
+    <section style="margin-bottom:2.5rem;line-height:1.6;">
+      <h2 style="font-size:1.2rem;font-weight:600;color:#fafafa;margin-bottom:0.75rem;">4. Segurança e Retenção</h2>
+      <p style="color:#a1a1aa;">
+        Prezamos por segurança em múltiplas camadas. Todos os tokens do Google são armazenados dentro de infraestruturas seguras
+        com controle de RLS (Nível de Segurança por Linha), significando que apenas você e a camada back-end encriptada têm acesso real às suas chaves.
+        Você pode revogar as chaves diretamente no painel de "Integrações" da nossa plataforma ou através da sua própria gestão de conta do Google.
+      </p>
+    </section>
+
+    <div style="margin-top:2rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
+      <a href="/termos.html" style="color:#06b6d4;text-decoration:none;font-weight:600;">&larr; Voltar para os Termos de Serviço</a>
+    </div>
+
+  </main>
+</body>
+</html>

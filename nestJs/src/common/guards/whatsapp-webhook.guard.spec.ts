@@ -1,6 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WhatsappWebhookGuard } from './whatsapp-webhook.guard';
+import { LogsService } from '../../logs/logs.service';
 
 function createExecutionContext(request: Record<string, unknown>) {
   return {
@@ -11,6 +12,13 @@ function createExecutionContext(request: Record<string, unknown>) {
 }
 
 describe('WhatsappWebhookGuard', () => {
+  const logsServiceMock = () =>
+    ({
+      warn: jest.fn().mockResolvedValue(null),
+      error: jest.fn().mockResolvedValue(null),
+      info: jest.fn().mockResolvedValue(null),
+    }) as unknown as LogsService;
+
   it('accepts configured api key in webhook header', async () => {
     const guard = new WhatsappWebhookGuard({
       get: jest.fn((key: string) => {
@@ -20,7 +28,7 @@ describe('WhatsappWebhookGuard', () => {
 
         return null;
       }),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, logsServiceMock());
 
     const allowed = await guard.canActivate(
       createExecutionContext({
@@ -41,7 +49,7 @@ describe('WhatsappWebhookGuard', () => {
 
         return null;
       }),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, logsServiceMock());
 
     const allowed = await guard.canActivate(
       createExecutionContext({
@@ -62,7 +70,7 @@ describe('WhatsappWebhookGuard', () => {
 
         return null;
       }),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, logsServiceMock());
 
     const allowed = await guard.canActivate(
       createExecutionContext({
@@ -101,7 +109,7 @@ describe('WhatsappWebhookGuard', () => {
 
         return null;
       }),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, logsServiceMock());
 
     const allowed = await guard.canActivate(
       createExecutionContext({
@@ -128,7 +136,7 @@ describe('WhatsappWebhookGuard', () => {
 
         return null;
       }),
-    } as unknown as ConfigService);
+    } as unknown as ConfigService, logsServiceMock());
 
     const allowed = await guard.canActivate(
       createExecutionContext({

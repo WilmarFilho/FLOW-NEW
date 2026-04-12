@@ -36,7 +36,6 @@ type AccessContext = {
 type IncomingMessage = {
   aiContextText: string | null;
   content: string | null;
-  externalMessageId: string | null;
   mediaBuffer: Buffer | null;
   mediaMimeType: string | null;
   messageType: 'text' | 'audio' | 'image' | 'video' | 'sticker' | 'unsupported';
@@ -114,6 +113,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       ? await this.findConversationContactIds(access.effectiveAdminId, search)
       : null;
 
+    const connectionJoin =
+      normalizedFilter === 'deleted'
+        ? 'whatsapp_connections!inner'
+        : 'whatsapp_connections!inner';
+
     const query = this.supabaseService
       .getClient()
       .from('conversas')
@@ -126,12 +130,14 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
           whatsapp,
           avatar_url
         ),
-        whatsapp_connections (
+        ${connectionJoin} (
           id,
           nome,
           numero,
           status,
           instance_name,
+          cor,
+          deleted_at,
           agente_id,
           conhecimento_id
         ),
@@ -151,6 +157,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     if (whatsappConnectionId) {
       query.eq('whatsapp_connection_id', whatsappConnectionId);
+    }
+
+    if (normalizedFilter === 'deleted') {
+      query.not('whatsapp_connections.deleted_at', 'is', null);
+    } else {
+      query.is('whatsapp_connections.deleted_at', null);
     }
 
     if (assignedUserId) {
@@ -285,7 +297,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         `
         *,
         contatos ( id, nome, whatsapp, avatar_url ),
-        whatsapp_connections ( id, nome, numero, status, instance_name ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
       )
@@ -296,6 +308,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .maybeSingle();
 
     if (existing) {
+      await this.touchContactConnectionPresence(
+        access.effectiveAdminId,
+        contatoId,
+        dto.whatsapp_connection_id,
+      );
       return this.refreshConversationContactAvatar(existing);
     }
 
@@ -313,7 +330,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         `
         *,
         contatos ( id, nome, whatsapp, avatar_url ),
-        whatsapp_connections ( id, nome, numero, status, instance_name ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
       )
@@ -322,6 +339,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     if (error || !data) {
       throw error;
     }
+
+    await this.touchContactConnectionPresence(
+      access.effectiveAdminId,
+      contatoId,
+      dto.whatsapp_connection_id,
+    );
 
     return this.refreshConversationContactAvatar(data);
   }
@@ -382,7 +405,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         `
         *,
         contatos ( id, nome, whatsapp, avatar_url ),
-        whatsapp_connections ( id, nome, numero, status, instance_name ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
       )
@@ -533,7 +556,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const { data: message, error } = await this.supabaseService
       .getClient()
       .from('conversas_mensagens')
-      .select('id, raw_payload, sender_type, direction, external_message_id, created_at')
+      .select('id, raw_payload, sender_type, direction, created_at')
       .eq('id', messageId)
       .eq('conversa_id', conversaId)
       .maybeSingle();
@@ -563,7 +586,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('A conexão do WhatsApp não está ativa.');
     }
 
-    const deletePayload = this.buildDeleteMessagePayload(message.raw_payload, message.external_message_id);
+    const deletePayload = this.buildDeleteMessagePayload(message.raw_payload);
     if (!deletePayload) {
       throw new BadRequestException('Não foi possível montar os dados da mensagem para exclusão.');
     }
@@ -594,6 +617,13 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   }
 
   private assertManualReplyAllowed(conversa: any) {
+    const connection = this.unwrapRelation<any>(conversa?.whatsapp_connections);
+    if (connection?.deleted_at) {
+      throw new BadRequestException(
+        'Nao e possivel enviar mensagens em conversas de conexoes excluidas.',
+      );
+    }
+
     if (conversa.ai_enabled) {
       throw new BadRequestException(
         'Desative a IA antes de responder manualmente.',
@@ -660,23 +690,25 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const { data: message } = await this.supabaseService
       .getClient()
       .from('conversas_mensagens')
-      .select('id, external_message_id, content, ai_context_text')
+      .select('id, raw_payload, content, ai_context_text')
       .eq('conversa_id', conversaId)
       .eq('id', replyToMessageId)
       .maybeSingle();
 
-    if (!message?.external_message_id) {
+    const quotedId = this.extractOutgoingMessageId(message?.raw_payload);
+
+    if (!quotedId) {
       return null;
     }
 
     return {
       key: {
-        id: message.external_message_id,
+        id: quotedId,
       },
       message: {
         conversation:
-          message.content ||
-          message.ai_context_text ||
+          message?.content ||
+          message?.ai_context_text ||
           'Mensagem respondida via FLOW',
       },
     };
@@ -700,17 +732,17 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     return 'unsupported';
   }
 
-  private buildDeleteMessagePayload(rawPayload: any, externalMessageId: string | null) {
+  private buildDeleteMessagePayload(rawPayload: any) {
     const key = rawPayload?.key || rawPayload?.data?.key || null;
     const remoteJid = key?.remoteJid || rawPayload?.remoteJid || rawPayload?.data?.remoteJid || null;
 
-    if (!remoteJid || !(key?.id || externalMessageId)) {
+    if (!remoteJid || !key?.id) {
       return null;
     }
 
     return {
       fromMe: true,
-      id: key?.id || externalMessageId,
+      id: key.id,
       participant: key?.participant || rawPayload?.participant || undefined,
       remoteJid,
     };
@@ -737,7 +769,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         conversa_id: params.conversation.id,
         profile_id: params.conversation.profile_id,
         whatsapp_connection_id: params.conversation.whatsapp_connection_id,
-        external_message_id: messageId,
         direction: 'outbound',
         sender_type: 'user',
         sender_user_id: params.senderUserId,
@@ -862,7 +893,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       ? await this.uploadMedia(
           conversa.profile_id,
           conversa.id,
-          message.externalMessageId,
+          this.extractOutgoingMessageId(message.rawPayload),
           message.messageType,
           message.mediaMimeType,
           message.mediaBuffer,
@@ -871,30 +902,26 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const preview = message.content || this.getFallbackPreview(message.messageType);
 
-    const { data: storedMessage, error: messageError } = await this.supabaseService
+    const { error: messageError } = await this.supabaseService
       .getClient()
       .from('conversas_mensagens')
-      .upsert(
-        {
-          conversa_id: conversa.id,
-          profile_id: conversa.profile_id,
-          whatsapp_connection_id: connectionId,
-          external_message_id: message.externalMessageId,
-          direction: 'inbound',
-          sender_type: 'customer',
-          message_type: message.messageType,
-          content: message.content,
-          ai_context_text: message.aiContextText,
-          media_url: mediaUpload?.publicUrl ?? null,
-          media_path: mediaUpload?.path ?? null,
-          media_mime_type: message.mediaMimeType,
-          raw_payload: message.rawPayload,
-          status: 'received',
-          created_at: now,
-          updated_at: now,
-        },
-        { onConflict: 'external_message_id' },
-      );
+      .insert({
+        conversa_id: conversa.id,
+        profile_id: conversa.profile_id,
+        whatsapp_connection_id: connectionId,
+        direction: 'inbound',
+        sender_type: 'customer',
+        message_type: message.messageType,
+        content: message.content,
+        ai_context_text: message.aiContextText,
+        media_url: mediaUpload?.publicUrl ?? null,
+        media_path: mediaUpload?.path ?? null,
+        media_mime_type: message.mediaMimeType,
+        raw_payload: message.rawPayload,
+        status: 'received',
+        created_at: now,
+        updated_at: now,
+      });
 
     if (messageError) {
       throw messageError;
@@ -905,7 +932,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .from('conversas_mensagens')
       .select('id')
       .eq('conversa_id', conversa.id)
-      .eq('external_message_id', message.externalMessageId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1065,7 +1091,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         `
         *,
         contatos ( id, nome, whatsapp, avatar_url ),
-        whatsapp_connections ( id, nome, numero, status, instance_name ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
       )
@@ -1100,7 +1126,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         `
         *,
         contatos ( id, nome, whatsapp, avatar_url ),
-        whatsapp_connections ( id, nome, numero, status, instance_name ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
         )
@@ -1323,9 +1349,17 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const phone = this.extractIncomingPhone(messageData, payload);
     if (!phone) {
-      this.logger.warn(
-        `Nao foi possivel extrair o telefone real do remetente para a instancia ${connection.instance_name}. remoteJid=${messageData.key.remoteJid || '[ausente]'} remoteJidAlt=${messageData.key.remoteJidAlt || '[ausente]'}`,
-      );
+      await this.logsService.warn({
+        action: 'conversas.handleWhatsappWebhook.extractPhone',
+        context: ConversasService.name,
+        message: `Nao foi possivel extrair o telefone real do remetente para a instancia ${connection.instance_name}.`,
+        metadata: {
+          instanceName: connection.instance_name,
+          remoteJid: messageData.key.remoteJid || '[ausente]',
+          remoteJidAlt: messageData.key.remoteJidAlt || '[ausente]',
+        },
+        user_id: connection.user_id,
+      });
       return null;
     }
 
@@ -1366,7 +1400,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     return {
       aiContextText,
       content,
-      externalMessageId: messageData.key.id || null,
       mediaBuffer,
       mediaMimeType,
       messageType,
@@ -1615,6 +1648,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         .maybeSingle();
 
     if (existing) {
+      await this.touchContactConnectionPresence(profileId, contatoId, connectionId);
       return existing;
     }
 
@@ -1635,7 +1669,36 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
 
+    await this.touchContactConnectionPresence(profileId, contatoId, connectionId);
+
     return data;
+  }
+
+  private async touchContactConnectionPresence(
+    profileId: string,
+    contatoId: string,
+    connectionId: string,
+  ) {
+    const now = new Date().toISOString();
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('contatos_whatsapp_connections')
+      .upsert(
+        {
+          profile_id: profileId,
+          contato_id: contatoId,
+          whatsapp_connection_id: connectionId,
+          last_seen_at: now,
+          updated_at: now,
+        },
+        {
+          onConflict: 'contato_id,whatsapp_connection_id',
+        },
+      );
+
+    if (error) {
+      throw error;
+    }
   }
 
   private async findConversationByPhone(
@@ -1692,7 +1755,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         await this.processSingleBatch(claimed);
       }
     } catch (error) {
-      this.logger.error('Erro ao processar lotes de conversas', error);
+      await this.logsService.error({
+        action: 'conversas.processPendingBatches',
+        context: ConversasService.name,
+        error,
+        message: 'Erro ao processar lotes de conversas',
+      });
     } finally {
       this.isProcessingBatches = false;
     }
@@ -1941,6 +2009,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
           numero,
           status,
           instance_name,
+          cor,
           agente_id,
           conhecimento_id,
           business_hours,
@@ -2879,7 +2948,6 @@ ${JSON.stringify(params.draftReply)}`,
       conversa_id: params.conversationId,
       profile_id: params.profileId,
       whatsapp_connection_id: params.whatsappConnectionId,
-      external_message_id: messageId,
       direction: 'outbound',
       sender_type: 'assistant',
       message_type: 'text',
@@ -2968,7 +3036,12 @@ ${JSON.stringify(params.draftReply)}`,
         return vision.choices[0]?.message?.content || params.content || 'Imagem recebida.';
       }
     } catch (error) {
-      this.logger.warn('Nao foi possivel enriquecer contexto de midia', error);
+      await this.logsService.warn({
+        action: 'conversas.buildAiContextFromIncomingMedia',
+        context: ConversasService.name,
+        error,
+        message: 'Nao foi possivel enriquecer contexto de midia',
+      });
     }
 
     if (params.messageType === 'video') {

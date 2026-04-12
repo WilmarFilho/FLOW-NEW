@@ -23,11 +23,11 @@ import TestModal from './TestModal';
 import styles from './WhatsappPage.module.css';
 import type { WhatsappConnection } from './ConnectionCard';
 
-type FilterStatus = 'todos' | 'connected' | 'disconnected';
+type FilterStatus = 'todos' | 'connected' | 'disconnected' | 'deleted';
 
 // ── SWR Fetchers ──────────────────────────────────────────────────
 const fetchConnections = async (uid: string) => {
-  return apiRequest<WhatsappConnection[]>('/whatsapp', { userId: uid });
+  return apiRequest<WhatsappConnection[]>('/whatsapp?includeDeleted=all', { userId: uid });
 };
 
 const fetchAgentes = async () => {
@@ -168,11 +168,6 @@ export default function WhatsappPage() {
             if (payload.eventType === 'INSERT') {
               return [payload.new as WhatsappConnection, ...current];
             } else if (payload.eventType === 'UPDATE') {
-              if ((payload.new as { deleted_at?: string | null } | null)?.deleted_at) {
-                return current.filter(
-                  (conn) => conn.id !== ((payload.new as { id?: string } | null)?.id)
-                );
-              }
               return current.map((conn) =>
                 conn.id === (payload.new as WhatsappConnection).id
                   ? { ...conn, ...(payload.new as WhatsappConnection) }
@@ -196,14 +191,18 @@ export default function WhatsappPage() {
 
   // Filtered connections
   const filteredConnections = connections.filter((conn) => {
-    if (filter === 'todos') return true;
-    return conn.status === filter;
+    if (filter === 'todos') return !conn.deleted_at;
+    if (filter === 'connected') return !conn.deleted_at && conn.status === 'connected';
+    if (filter === 'disconnected') return !conn.deleted_at && conn.status === 'disconnected';
+    if (filter === 'deleted') return Boolean(conn.deleted_at);
+    return false;
   });
 
   // Create connection
   const handleCreate = useCallback(
     async (data: {
       nome: string;
+      cor: string;
       numero?: string;
       agente_id?: string;
       conhecimento_id?: string;
@@ -219,6 +218,7 @@ export default function WhatsappPage() {
         userId,
         body: {
           nome: data.nome,
+          cor: data.cor,
           numero: data.numero,
           agente_id: data.agente_id,
           conhecimento_id: data.conhecimento_id,
@@ -242,6 +242,7 @@ export default function WhatsappPage() {
       id: string,
       data: {
         nome?: string;
+        cor?: string;
         agente_id?: string;
         conhecimento_id?: string;
         business_hours?: {
@@ -324,8 +325,9 @@ export default function WhatsappPage() {
     [userId, mutateConnections]
   );
 
-  const connectedCount = connections.filter((c) => c.status === 'connected').length;
-  const totalCount = connections.length;
+  const activeConnections = connections.filter((c) => !c.deleted_at);
+  const connectedCount = activeConnections.filter((c) => c.status === 'connected').length;
+  const totalCount = activeConnections.length;
 
   return (
     <motion.div
@@ -376,7 +378,7 @@ export default function WhatsappPage() {
         initial="hidden"
         animate="visible"
       >
-        {(['todos', 'connected', 'disconnected'] as FilterStatus[]).map((f) => (
+        {(['todos', 'connected', 'disconnected', 'deleted'] as FilterStatus[]).map((f) => (
           <motion.button
             key={f}
             className={`${styles.filterChip} ${filter === f ? styles.filterChipActive : ''}`}
@@ -386,7 +388,13 @@ export default function WhatsappPage() {
             whileTap={{ scale: 0.95 }}
             layout
           >
-            {f === 'todos' ? 'Todos' : f === 'connected' ? 'Conectados' : 'Desconectados'}
+            {f === 'todos'
+              ? 'Todos'
+              : f === 'connected'
+                ? 'Conectados'
+                : f === 'disconnected'
+                  ? 'Desconectados'
+                  : 'Excluídas'}
           </motion.button>
         ))}
       </motion.div>

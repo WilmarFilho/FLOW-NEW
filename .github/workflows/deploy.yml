@@ -1,0 +1,52 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+          
+      - name: Add VPS to known_hosts
+        run: ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # Navega até a pasta do projeto (ajuste o caminho se necessário)
+            # EX: cd /home/usuario/FLOW
+            cd /root/FLOW
+            
+            # Puxa o código mais recente
+            git pull origin main
+            
+            # Atualiza o arquivo .env com o secret do github
+            # Isso requer que você crie o Secret "ENV_PROD" no GitHub 
+            # com o conteúdo do seu .env da produção (Next, Nest e demais envs unificadas se desejar ou usar separado)
+            echo "${{ secrets.ENV_PROD }}" > .env
+            
+            # Se preferir usar ENV_NEXT_PROD e ENV_NEST_PROD separados (remova echo acima):
+            # echo "${{ secrets.ENV_NEXT_PROD }}" > nextJs/.env
+            # echo "${{ secrets.ENV_NEST_PROD }}" > nestJs/.env
+            
+            # Reconstrói e sobe os conteineres em background
+            docker compose down
+            docker compose up -d --build
+            
+            # Limpa imagens antigas não utilizadas pelo docker para evitar consumo de disco
+            docker image prune -f

@@ -34,6 +34,12 @@ export class ConhecimentosService {
       this.logger.warn(
         'OPENAI_API_KEY não configurada. Funcionalidades de IA estarão indisponíveis.',
       );
+      void this.logsService.warn({
+        action: 'conhecimentos.config',
+        context: ConhecimentosService.name,
+        message:
+          'OPENAI_API_KEY não configurada. Funcionalidades de IA estarão indisponíveis.',
+      });
     }
     this.openai = new OpenAI({
       apiKey: apiKey || 'sk-placeholder-configure-env',
@@ -51,7 +57,13 @@ export class ConhecimentosService {
       .order('created_at', { ascending: false });
 
     if (error) {
-      this.logger.error(`Failed to list conhecimentos: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.list',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to list conhecimentos: ${error.message}`,
+        user_id: userId,
+      });
       throw error;
     }
     return data;
@@ -87,7 +99,13 @@ export class ConhecimentosService {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to create conhecimento: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.create',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to create conhecimento: ${error.message}`,
+        user_id: dto.user_id,
+      });
       throw error;
     }
 
@@ -111,7 +129,14 @@ export class ConhecimentosService {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to update conhecimento: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.update',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to update conhecimento: ${error.message}`,
+        metadata: { conhecimentoId: id },
+        user_id: userId,
+      });
       throw error;
     }
     if (!data) throw new NotFoundException('Base não encontrada');
@@ -142,7 +167,14 @@ export class ConhecimentosService {
       .eq('user_id', userId);
 
     if (error) {
-      this.logger.error(`Failed to delete conhecimento: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.delete',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to delete conhecimento: ${error.message}`,
+        metadata: { conhecimentoId: id },
+        user_id: userId,
+      });
       throw error;
     }
     return { deleted: true };
@@ -159,7 +191,13 @@ export class ConhecimentosService {
       .order('created_at', { ascending: true });
 
     if (error) {
-      this.logger.error(`Failed to get messages: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.getMessages',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to get messages: ${error.message}`,
+        metadata: { conhecimentoId },
+      });
       throw error;
     }
     return data || [];
@@ -271,7 +309,14 @@ export class ConhecimentosService {
         });
 
       if (uploadError) {
-        this.logger.error(`File upload failed: ${uploadError.message}`);
+        await this.logsService.error({
+          action: 'conhecimentos.processFileUpload.storage',
+          context: ConhecimentosService.name,
+          error: uploadError,
+          message: `File upload failed: ${uploadError.message}`,
+          metadata: { conhecimentoId, fileName, mimeType },
+          user_id: userId,
+        });
         throw new BadRequestException('Falha no upload do arquivo');
       }
 
@@ -389,7 +434,13 @@ export class ConhecimentosService {
       });
 
     if (error) {
-      this.logger.error(`Failed to save message: ${error.message}`);
+      await this.logsService.error({
+        action: 'conhecimentos.saveMessage',
+        context: ConhecimentosService.name,
+        error,
+        message: `Failed to save message: ${error.message}`,
+        metadata: { conhecimentoId, role },
+      });
     }
   }
 
@@ -418,7 +469,13 @@ export class ConhecimentosService {
         });
 
       if (error) {
-        this.logger.error(`Failed to store chunk: ${error.message}`);
+        await this.logsService.error({
+          action: 'conhecimentos.embedAndStore.insertChunk',
+          context: ConhecimentosService.name,
+          error,
+          message: `Failed to store chunk: ${error.message}`,
+          metadata: { conhecimentoId },
+        });
         throw error;
       }
 
@@ -435,7 +492,13 @@ export class ConhecimentosService {
         .update({ total_chunks: count || 0 })
         .eq('id', conhecimentoId);
     } catch (error) {
-      this.logger.error(`Embed and store failed: ${error}`);
+      await this.logsService.error({
+        action: 'conhecimentos.embedAndStore',
+        context: ConhecimentosService.name,
+        error,
+        message: `Embed and store failed: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: { conhecimentoId },
+      });
       throw error;
     }
   }

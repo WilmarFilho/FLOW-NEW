@@ -1,6 +1,6 @@
 export type ListConversasParams = {
   assignedUserId?: string;
-  filter?: 'all' | 'mine' | 'unread' | 'ai';
+  filter?: 'all' | 'mine' | 'unread' | 'ai' | 'deleted';
   limit?: number;
   offset?: number;
   search?: string;

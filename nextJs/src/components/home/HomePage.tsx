@@ -150,7 +150,6 @@ function ChartPanel({
       <div className={styles.chartHeader}>
         <div>
           <span className={styles.eyebrow}>Pulso operacional</span>
-          <h2>Movimento da operação ao longo do tempo</h2>
           <p>
             Ligue ou desligue séries para comparar volume de chats, mensagens,
             contatos e campanhas no mesmo recorte.
@@ -170,10 +169,6 @@ function ChartPanel({
                   }`}
                 onClick={() => onToggleSeries(series)}
               >
-                <span
-                  className={styles.seriesDot}
-                  style={{ backgroundColor: meta.color }}
-                />
                 {meta.label}
               </button>
             );
@@ -350,6 +345,42 @@ export default function HomePage() {
     };
   }, [data]);
 
+  const appointmentSummary = useMemo(() => {
+    if (!data) {
+      return {
+        total: 0,
+        confirmed: 0,
+        pending: 0,
+        cancelled: 0,
+        busiestDay: null as DashboardData['appointmentsByWeekday'][number] | null,
+      };
+    }
+
+    const totals = data.appointmentsByWeekday.reduce(
+      (acc, day) => {
+        acc.total += day.total;
+        acc.confirmed += day.confirmed;
+        acc.pending += day.pending;
+        acc.cancelled += day.cancelled;
+        return acc;
+      },
+      { total: 0, confirmed: 0, pending: 0, cancelled: 0 },
+    );
+
+    const busiestDay = data.appointmentsByWeekday.reduce<DashboardData['appointmentsByWeekday'][number] | null>(
+      (current, day) => {
+        if (!current || day.total > current.total) {
+          return day;
+        }
+
+        return current;
+      },
+      null,
+    );
+
+    return { ...totals, busiestDay };
+  }, [data]);
+
   const donutCircumference = 2 * Math.PI * 52;
   const humanStroke = (doughnutValues.human / 100) * donutCircumference;
   const archivedStroke = (doughnutValues.archived / 100) * donutCircumference;
@@ -389,7 +420,7 @@ export default function HomePage() {
     >
       <motion.header className={styles.header} variants={headerEntrance}>
         <div className={styles.headerContent}>
-          <span className={styles.headerEyebrow}>Dashboard FLOW</span>
+          <span className={styles.headerEyebrow}>Dashboard</span>
 
         </div>
 
@@ -431,10 +462,10 @@ export default function HomePage() {
             <strong className={styles.statValue}>{card.value}</strong>
             <span
               className={`${styles.statDelta} ${card.metric.direction === 'down'
-                  ? styles.statDeltaDown
-                  : card.metric.direction === 'up'
-                    ? styles.statDeltaUp
-                    : styles.statDeltaFlat
+                ? styles.statDeltaDown
+                : card.metric.direction === 'up'
+                  ? styles.statDeltaUp
+                  : styles.statDeltaFlat
                 }`}
             >
               {formatDelta(card.metric)}
@@ -453,7 +484,6 @@ export default function HomePage() {
         <motion.aside className={styles.engineCard} variants={cardEntrance}>
           <div className={styles.engineHeader}>
             <span className={styles.eyebrow}>Estado do funil</span>
-            <h2>Saúde do motor de atendimento</h2>
             <p>
               Veja como os chats estão distribuídos entre operação ativa,
               arquivados e pontos que pedem atenção humana.
@@ -548,7 +578,6 @@ export default function HomePage() {
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.eyebrow}>Distribuição</span>
-              <h3>Chats por usuário</h3>
             </div>
             <Users size={18} className={styles.panelIcon} />
           </div>
@@ -589,63 +618,67 @@ export default function HomePage() {
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.eyebrow}>Agenda da semana</span>
-              <h3>Agendamentos por dia</h3>
             </div>
             <Clock3 size={18} className={styles.panelIcon} />
           </div>
 
+          <div className={styles.weekSummary}>
+            <div className={styles.weekSummaryCard}>
+              <span>Total da semana</span>
+              <strong>{appointmentSummary.total}</strong>
+            </div>
+          </div>
+
           <div className={styles.weekList}>
             {data.appointmentsByWeekday.map((day) => {
-              const maxTotal = Math.max(
-                1,
-                ...data.appointmentsByWeekday.map((entry) => entry.total),
-              );
-              const height = 26 + (day.total / maxTotal) * 90;
+              const total = Math.max(day.total, 1);
+              const confirmedWidth = (day.confirmed / total) * 100;
+              const pendingWidth = (day.pending / total) * 100;
+              const cancelledWidth = (day.cancelled / total) * 100;
 
               return (
                 <div key={day.key} className={styles.weekItem}>
-                  <div className={styles.weekColumns}>
+                  <div className={styles.weekItemTop}>
+                    <div className={styles.weekDayInfo}>
+                      <strong>{day.label}</strong>
+                      <span>
+                        {day.total === 0
+                          ? 'Sem agendamentos'
+                          : `${day.total} agendamento(s)`}
+                      </span>
+                    </div>
+                    <b className={styles.weekTotal}>{day.total}</b>
+                  </div>
+                  <div className={styles.weekBar}>
                     <div
-                      className={styles.weekColumnConfirmed}
-                      style={{ height: `${(day.confirmed / maxTotal) * height}px` }}
+                      className={styles.weekBarConfirmed}
+                      style={{ width: `${confirmedWidth}%` }}
                     />
                     <div
-                      className={styles.weekColumnPending}
-                      style={{ height: `${(day.pending / maxTotal) * height}px` }}
+                      className={styles.weekBarPending}
+                      style={{ width: `${pendingWidth}%` }}
                     />
                     <div
-                      className={styles.weekColumnCancelled}
-                      style={{ height: `${(day.cancelled / maxTotal) * height}px` }}
+                      className={styles.weekBarCancelled}
+                      style={{ width: `${cancelledWidth}%` }}
                     />
                   </div>
-                  <strong>{day.total}</strong>
-                  <span>{day.label}</span>
+                  <div className={styles.weekBreakdown}>
+                    <span>Confirmados: {day.confirmed}</span>
+                    <span>Pendentes: {day.pending}</span>
+                    <span>Cancelados: {day.cancelled}</span>
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className={styles.legendRow}>
-            <span>
-              <i className={styles.legendConfirmed} />
-              Confirmado
-            </span>
-            <span>
-              <i className={styles.legendPending} />
-              Pendente
-            </span>
-            <span>
-              <i className={styles.legendCancelled} />
-              Cancelado
-            </span>
-          </div>
         </motion.article>
 
         <motion.article className={styles.panel} variants={cardEntrance}>
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.eyebrow}>Canais em foco</span>
-              <h3>WhatsApps mais ativos</h3>
             </div>
             <Activity size={18} className={styles.panelIcon} />
           </div>
@@ -685,7 +718,6 @@ export default function HomePage() {
           <div className={styles.panelHeader}>
             <div>
               <span className={styles.eyebrow}>Campanhas recentes</span>
-              <h3>Últimos movimentos</h3>
             </div>
             <Sparkles size={18} className={styles.panelIcon} />
           </div>

@@ -5,6 +5,7 @@ import { WhatsappService } from './whatsapp.service';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { WhatsappWebhookGuard } from '../common/guards/whatsapp-webhook.guard';
 import { SupabaseService } from '../supabase/supabase.service';
+import { LogsService } from '../logs/logs.service';
 
 describe('WhatsappController', () => {
   let controller: WhatsappController;
@@ -50,6 +51,15 @@ describe('WhatsappController', () => {
           provide: ConfigService,
           useValue: { get: jest.fn() },
         },
+        {
+          provide: LogsService,
+          useValue: {
+            warn: jest.fn(),
+            error: jest.fn(),
+            info: jest.fn(),
+            createLog: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -62,7 +72,9 @@ describe('WhatsappController', () => {
 
   it('should list connections', async () => {
     const result = await controller.listConnections('user-1');
-    expect(mockService.listConnections).toHaveBeenCalledWith('user-1');
+    expect(mockService.listConnections).toHaveBeenCalledWith('user-1', {
+      includeDeleted: false,
+    });
     expect(result).toHaveLength(1);
   });
 

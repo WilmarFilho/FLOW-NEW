@@ -17,6 +17,7 @@ interface ConnectionModalProps {
   conhecimentos: { id: string; titulo: string }[];
   onSubmit: (data: {
     nome: string;
+    cor: string;
     numero?: string;
     agente_id?: string;
     conhecimento_id?: string;
@@ -31,6 +32,7 @@ interface ConnectionModalProps {
     id: string,
     data: {
       nome?: string;
+      cor?: string;
       agente_id?: string;
       conhecimento_id?: string;
       business_hours?: {
@@ -52,6 +54,17 @@ type BusinessHours = {
 };
 
 type ModalStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+const CONNECTION_COLOR_OPTIONS = [
+  '#22c55e',
+  '#3b82f6',
+  '#f97316',
+  '#eab308',
+  '#ef4444',
+  '#a855f7',
+  '#14b8a6',
+  '#ec4899',
+];
 
 const WEEKDAY_OPTIONS = [
   { key: 'monday', label: 'Segunda' },
@@ -115,6 +128,7 @@ export default function ConnectionModal({
   const [step, setStep] = useState<ModalStep>(getInitialStep(editMode));
   const [useQR, setUseQR] = useState(true);
   const [nome, setNome] = useState(connection?.nome || '');
+  const [cor, setCor] = useState(connection?.cor || CONNECTION_COLOR_OPTIONS[0]);
   const [numero, setNumero] = useState(connection?.numero || '');
   const [agenteId, setAgenteId] = useState(connection?.agente_id || '');
   const [conhecimentoId, setConhecimentoId] = useState(connection?.conhecimento_id || '');
@@ -139,6 +153,7 @@ export default function ConnectionModal({
     setStep(reconnectMode ? 6 : getInitialStep(editMode));
     setUseQR(true);
     setNome(connection?.nome || '');
+    setCor(connection?.cor || CONNECTION_COLOR_OPTIONS[0]);
     setNumero(connection?.numero || '');
     setAgenteId(connection?.agente_id || '');
     setConhecimentoId(connection?.conhecimento_id || '');
@@ -241,7 +256,7 @@ export default function ConnectionModal({
 
     if (step === 5) {
       return {
-        description: 'Configure quando a IA pode oferecer horarios e qual duracao usar em cada encaixe.',
+        description: 'Defina em quais horarios a IA pode oferecer agendamentos e qual duracao usar em cada opcao sugerida.',
         title: 'Agenda automatica',
       };
     }
@@ -285,6 +300,7 @@ export default function ConnectionModal({
     setStep(getInitialStep(editMode));
     setUseQR(true);
     setNome('');
+    setCor(CONNECTION_COLOR_OPTIONS[0]);
     setNumero('');
     setAgenteId('');
     setConhecimentoId('');
@@ -396,6 +412,7 @@ export default function ConnectionModal({
       if (editMode && connection) {
         await onUpdate(connection.id, {
           nome: nome.trim(),
+          cor,
           agente_id: agenteId || undefined,
           conhecimento_id: conhecimentoId || undefined,
           business_hours: businessHours,
@@ -407,6 +424,7 @@ export default function ConnectionModal({
 
       const result = await onSubmit({
         nome: nome.trim(),
+        cor,
         numero: !useQR ? numero.trim() : undefined,
         agente_id: agenteId || undefined,
         conhecimento_id: conhecimentoId || undefined,
@@ -500,6 +518,35 @@ export default function ConnectionModal({
                 value={nome}
                 onChange={(event) => setNome(event.target.value)}
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Cor da conexao</label>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {CONNECTION_COLOR_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCor(option)}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      border:
+                        cor === option
+                          ? '2px solid rgba(255,255,255,0.92)'
+                          : '1px solid rgba(255,255,255,0.14)',
+                      backgroundColor: option,
+                      boxShadow:
+                        cor === option
+                          ? '0 0 0 3px rgba(255,255,255,0.08)'
+                          : 'none',
+                    }}
+                    aria-label={`Selecionar cor ${option}`}
+                  />
+                ))}
+              </div>
             </div>
 
             {!editMode && !useQR && (
@@ -609,7 +656,7 @@ export default function ConnectionModal({
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Horario aberto do estabelecimento</label>
               <p className={styles.stepHelper}>
-                A IA vai cruzar esses horarios com os agendamentos ocupados antes de oferecer opcoes ao cliente.
+                Estes horarios servem para a IA saber quando ela pode oferecer opcoes de agendamento ao cliente. Isso nao limita as respostas da IA: ela continua respondendo mensagens 24 horas por dia.
               </p>
 
               <div className={styles.businessHoursGrid}>
@@ -655,6 +702,9 @@ export default function ConnectionModal({
 
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>Duracao padrao dos slots</label>
+              <p className={styles.stepHelper}>
+                Esse tempo define o tamanho de cada horario que a IA pode sugerir ao marcar um atendimento, reuniao ou visita.
+              </p>
               <div className={styles.slotOptions}>
                 {SLOT_OPTIONS.map((minutes) => (
                   <button

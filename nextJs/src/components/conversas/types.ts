@@ -1,4 +1,4 @@
-export type ConversationFilter = 'all' | 'mine' | 'unread' | 'ai';
+export type ConversationFilter = 'all' | 'mine' | 'unread' | 'ai' | 'deleted';
 export type MobilePane = 'list' | 'chat';
 
 export interface ConversationAssignedOption {
@@ -24,6 +24,8 @@ export interface ConversationContact {
 export interface ConversationConnection {
   id: string;
   nome: string;
+  cor: string | null;
+  deleted_at?: string | null;
   numero: string | null;
   status: 'connected' | 'connecting' | 'disconnected';
 }
@@ -59,7 +61,6 @@ export interface ConversationMessage {
   conversa_id: string;
   profile_id: string;
   whatsapp_connection_id: string;
-  external_message_id: string | null;
   direction: 'inbound' | 'outbound' | 'system';
   sender_type: 'customer' | 'user' | 'assistant' | 'system';
   sender_user_id: string | null;

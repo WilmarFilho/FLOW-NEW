@@ -41,6 +41,7 @@ export class ConversasController {
         query.filter === 'mine' ||
         query.filter === 'unread' ||
         query.filter === 'ai' ||
+        query.filter === 'deleted' ||
         query.filter === 'all'
           ? query.filter
           : undefined,

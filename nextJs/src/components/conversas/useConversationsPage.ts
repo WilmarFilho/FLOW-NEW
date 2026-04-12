@@ -95,6 +95,52 @@ function mergeConversationPages(
   return merged;
 }
 
+function upsertMessage(
+  current: ConversationMessage[],
+  incoming: ConversationMessage,
+) {
+  const index = current.findIndex((item) => item.id === incoming.id);
+
+  if (index >= 0) {
+    const next = [...current];
+    next[index] = incoming;
+    return next;
+  }
+
+  return [...current, incoming].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+}
+
+function removeMessage(current: ConversationMessage[], messageId: string) {
+  return current.filter((item) => item.id !== messageId);
+}
+
+function buildConversationPreviewFromMessage(message: Partial<ConversationMessage>) {
+  if (message.content?.trim()) {
+    return message.content.trim();
+  }
+
+  if (message.message_type === 'audio') {
+    return 'Audio enviado';
+  }
+
+  if (message.message_type === 'image') {
+    return 'Imagem enviada';
+  }
+
+  if (message.message_type === 'video') {
+    return 'Video enviado';
+  }
+
+  if (message.message_type === 'sticker') {
+    return 'Figurinha enviada';
+  }
+
+  return 'Nova mensagem';
+}
+
 export function useConversationsPage() {
   const [userId, setUserId] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
@@ -158,6 +204,37 @@ export function useConversationsPage() {
     ([, conversationId, uid]) =>
       apiRequest<ConversationSummary>(`/conversas/${conversationId}`, { userId: uid }),
     REFRESH_OPTIONS,
+  );
+
+  const patchConversationInState = useCallback(
+    (
+      conversationId: string,
+      updater: (current: ConversationSummary) => ConversationSummary,
+    ) => {
+      setConversations((current) => {
+        const index = current.findIndex((item) => item.id === conversationId);
+        if (index < 0) {
+          return current;
+        }
+
+        const next = [...current];
+        next[index] = updater(next[index]);
+        return next.sort(
+          (a, b) =>
+            new Date(b.last_message_at).getTime() -
+            new Date(a.last_message_at).getTime(),
+        );
+      });
+
+      void mutateSelectedConversation((current) => {
+        if (!current || current.id !== conversationId) {
+          return current;
+        }
+
+        return updater(current);
+      }, false);
+    },
+    [mutateSelectedConversation],
   );
 
   const loadConversations = useCallback(
@@ -293,12 +370,6 @@ export function useConversationsPage() {
   }, [loadMessages, selectedConversationId]);
 
   useEffect(() => {
-    if (!selectedConversationId && conversations.length > 0) {
-      setSelectedConversationId(conversations[0].id);
-    }
-  }, [conversations, selectedConversationId]);
-
-  useEffect(() => {
     if (!selectedConversationId || !selectedConversation?.unread_count || !userId) {
       return;
     }
@@ -307,11 +378,15 @@ export function useConversationsPage() {
       method: 'PATCH',
       userId,
     })
-      .then(() => Promise.all([loadConversations('replace'), mutateSelectedConversation()]))
+      .then(() => {
+        patchConversationInState(selectedConversationId, (current) => ({
+          ...current,
+          unread_count: 0,
+        }));
+      })
       .catch(() => undefined);
   }, [
-    loadConversations,
-    mutateSelectedConversation,
+    patchConversationInState,
     selectedConversation?.unread_count,
     selectedConversationId,
     userId,
@@ -322,37 +397,66 @@ export function useConversationsPage() {
       return;
     }
 
-    const refreshConversations = () => {
-      void loadConversations('replace');
-    };
+    const handleConversationChange = (
+      payload: RealtimePostgresChangesPayload<Partial<ConversationSummary>>,
+    ) => {
+      const record =
+        payload.eventType === 'DELETE'
+          ? (payload.old as Partial<ConversationSummary> | null)
+          : (payload.new as Partial<ConversationSummary> | null);
 
-    const refreshMessages = () => {
-      if (selectedConversationId) {
-        void loadMessages('replace');
-        void mutateSelectedConversation();
+      if (!record?.id) {
+        return;
       }
-    };
 
-    const handleConversationChange = () => {
-      refreshConversations();
-      refreshMessages();
+      if (payload.eventType === 'DELETE') {
+        setConversations((current) => current.filter((item) => item.id !== record.id));
+        if (selectedConversationId === record.id) {
+          setSelectedConversationId(null);
+          setMessages([]);
+        }
+        return;
+      }
+
+      patchConversationInState(record.id, (current) => ({
+        ...current,
+        ...record,
+      }));
     };
 
     const handleMessageChange = (
-      payload: RealtimePostgresChangesPayload<{ conversa_id?: string }>,
+      payload: RealtimePostgresChangesPayload<ConversationMessage>,
     ) => {
-      const record = (payload.new || payload.old) as
-        | { conversa_id?: string }
-        | null;
+      const record =
+        payload.eventType === 'DELETE'
+          ? (payload.old as ConversationMessage | null)
+          : (payload.new as ConversationMessage | null);
 
-      if (record?.conversa_id && !selectedConversationId) {
-        setSelectedConversationId(record.conversa_id);
+      if (!record?.conversa_id) {
+        return;
       }
 
-      refreshConversations();
-      if (!record?.conversa_id || record.conversa_id === selectedConversationId) {
-        refreshMessages();
+      if (record.conversa_id === selectedConversationId) {
+        setMessages((current) =>
+          payload.eventType === 'DELETE'
+            ? removeMessage(current, record.id)
+            : upsertMessage(current, record),
+        );
       }
+
+      patchConversationInState(record.conversa_id, (current) => ({
+        ...current,
+        last_message_at: record.created_at || current.last_message_at,
+        last_message_preview:
+          payload.eventType === 'DELETE'
+            ? current.last_message_preview
+            : buildConversationPreviewFromMessage(record),
+        unread_count:
+          record.direction === 'inbound'
+            ? current.unread_count + 1
+            : current.unread_count,
+        updated_at: record.updated_at || current.updated_at,
+      }));
     };
 
     const channel = supabase
@@ -373,9 +477,7 @@ export function useConversationsPage() {
       void supabase.removeChannel(channel);
     };
   }, [
-    loadConversations,
-    loadMessages,
-    mutateSelectedConversation,
+    patchConversationInState,
     selectedConversationId,
     userId,
   ]);
@@ -405,7 +507,10 @@ export function useConversationsPage() {
       setIsComposerOpen(false);
       setSelectedConversationId(created.id);
       setMobilePane('chat');
-      await Promise.all([loadConversations('replace'), mutateSelectedConversation()]);
+      setConversations((current) => [
+        created,
+        ...current.filter((item) => item.id !== created.id),
+      ]);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -415,6 +520,78 @@ export function useConversationsPage() {
     } finally {
       setIsCreatingConversation(false);
     }
+  };
+
+  const renameConversationContact = async (contactId: string, nome: string) => {
+    if (!userId) {
+      return;
+    }
+
+    const trimmedName = nome.trim();
+    if (!trimmedName) {
+      throw new Error('Informe o nome do contato.');
+    }
+
+    const updatedContact = await apiRequest<{
+      id: string;
+      nome: string;
+    }>(`/contatos/${contactId}`, {
+      method: 'PATCH',
+      userId,
+      body: { nome: trimmedName },
+    });
+
+    setConversations((current) =>
+      current.map((conversation) => {
+        const contact = conversation.contatos;
+
+        if (Array.isArray(contact)) {
+          return {
+            ...conversation,
+            contatos: contact.map((item) =>
+              item.id === updatedContact.id ? { ...item, nome: updatedContact.nome } : item,
+            ),
+          };
+        }
+
+        if (contact?.id === updatedContact.id) {
+          return {
+            ...conversation,
+            contatos: { ...contact, nome: updatedContact.nome },
+          };
+        }
+
+        return conversation;
+      }),
+    );
+
+    await mutateSelectedConversation((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const contact = current.contatos;
+
+      if (Array.isArray(contact)) {
+        return {
+          ...current,
+          contatos: contact.map((item) =>
+            item.id === updatedContact.id ? { ...item, nome: updatedContact.nome } : item,
+          ),
+        };
+      }
+
+      if (contact?.id === updatedContact.id) {
+        return {
+          ...current,
+          contatos: { ...contact, nome: updatedContact.nome },
+        };
+      }
+
+      return current;
+    }, false);
+
+    return updatedContact;
   };
 
   const sendMessage = async (content: string, replyToMessageId?: string) => {
@@ -430,12 +607,6 @@ export function useConversationsPage() {
         userId,
         body: { content, reply_to_message_id: replyToMessageId },
       });
-
-      await Promise.all([
-        loadMessages('replace'),
-        loadConversations('replace'),
-        mutateSelectedConversation(),
-      ]);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Não foi possível enviar a mensagem.',
@@ -477,12 +648,6 @@ export function useConversationsPage() {
           | null;
         throw new Error(payload?.message || 'Não foi possível enviar o arquivo.');
       }
-
-      await Promise.all([
-        loadMessages('replace'),
-        loadConversations('replace'),
-        mutateSelectedConversation(),
-      ]);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
@@ -502,12 +667,6 @@ export function useConversationsPage() {
         method: 'DELETE',
         userId,
       });
-
-      await Promise.all([
-        loadMessages('replace'),
-        loadConversations('replace'),
-        mutateSelectedConversation(),
-      ]);
       toast.success('Mensagem excluída.');
     } catch (error) {
       toast.error(
@@ -531,7 +690,12 @@ export function useConversationsPage() {
       });
 
       toast.success(enabled ? 'IA reativada.' : 'IA desativada para atendimento manual.');
-      await Promise.all([loadConversations('replace'), mutateSelectedConversation()]);
+      patchConversationInState(selectedConversationId, (current) => ({
+        ...current,
+        ai_disabled_at: enabled ? null : new Date().toISOString(),
+        ai_enabled: enabled,
+        updated_at: new Date().toISOString(),
+      }));
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -574,6 +738,7 @@ export function useConversationsPage() {
     mobilePane,
     options,
     search,
+    renameConversationContact,
     selectedAssignedUserId,
     selectedConnectionId,
     selectedConversation,

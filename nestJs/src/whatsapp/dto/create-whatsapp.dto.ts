@@ -1,5 +1,6 @@
 export class CreateWhatsappDto {
   nome!: string;
+  cor?: string;
   numero?: string;
   agente_id?: string;
   conhecimento_id?: string;

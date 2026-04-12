@@ -5,10 +5,11 @@ import { createPortal } from 'react-dom';
 import useSWR from 'swr';
 import { supabase } from '@/lib/supabaseClient';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { GripVertical, Plus, User, X } from 'lucide-react';
+import { GripVertical, Plus, Trash2, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import ModalNovaLista from '@/components/contatos/ModalNovaLista';
 import ModalAdicionarContato from '@/components/contatos/ModalAdicionarContato';
+import ModalConfirmacao from '@/components/contatos/ModalConfirmacao';
 import { apiRequest } from '@/lib/api/client';
 
 const fetcher = async (url: string, uid: string) => {
@@ -86,6 +87,8 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
   const [mounted, setMounted] = useState(false);
 
   const [addContatoListId, setAddContatoListId] = useState<{ id: string, nome: string, existingIds: string[] } | null>(null);
+  const [deleteListaTarget, setDeleteListaTarget] = useState<{ id: string; nome: string } | null>(null);
+  const [isDeletingLista, setIsDeletingLista] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -159,12 +162,12 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
     }
   };
 
-  const handleCreateLista = async (nome: string, cor: string) => {
+  const handleCreateLista = async (nome: string, cor: string, descricao: string) => {
     try {
       await apiRequest('/contatos/listas', {
         method: 'POST',
         userId,
-        body: { nome, cor },
+        body: { nome, cor, descricao },
       });
       mutate();
       toast.success("Lista criada com sucesso!");
@@ -216,6 +219,25 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
     }
   };
 
+  const handleDeleteLista = async () => {
+    if (!deleteListaTarget) return;
+
+    setIsDeletingLista(true);
+    try {
+      await apiRequest(`/contatos/listas/${deleteListaTarget.id}`, {
+        method: 'DELETE',
+        userId,
+      });
+      await mutate();
+      toast.success('Lista excluída com sucesso!');
+      setDeleteListaTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao excluir lista.');
+    } finally {
+      setIsDeletingLista(false);
+    }
+  };
+
   if (isLoading || (!boardData || boardData.length === 0)) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-white/40 h-[60vh]">
@@ -250,6 +272,16 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
                       {list.cards?.length || 0}
                     </span>
                   </div>
+                  {!list.is_fixed ? (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteListaTarget({ id: list.id, nome: list.nome })}
+                      className="p-2 text-white/35 hover:text-white/80 hover:bg-white/8 rounded-lg transition-colors"
+                      title="Excluir lista"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* Droppable Area — flex-1 ocupa o espaço restante, scroll vertical sem barra */}
@@ -304,6 +336,20 @@ export default function KanbanBoard({ isNovaListaOpen, onCloseNovaLista, isAdmin
           onSubmit={handleVincularContato}
           userId={userId}
           existingIds={addContatoListId.existingIds}
+        />,
+        document.body
+      )}
+
+      {mounted && deleteListaTarget && createPortal(
+        <ModalConfirmacao
+          isOpen={!!deleteListaTarget}
+          onClose={() => setDeleteListaTarget(null)}
+          onConfirm={handleDeleteLista}
+          title="Excluir Lista"
+          message={`Tem certeza que deseja excluir a lista "${deleteListaTarget.nome}"? Os contatos não serão apagados, apenas removidos desta etapa do CRM.`}
+          confirmText="Sim, excluir lista"
+          cancelText="Cancelar"
+          loading={isDeletingLista}
         />,
         document.body
       )}

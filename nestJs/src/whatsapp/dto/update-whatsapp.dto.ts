@@ -1,5 +1,6 @@
 export class UpdateWhatsappDto {
   nome?: string;
+  cor?: string;
   agente_id?: string;
   conhecimento_id?: string;
   business_hours?: {

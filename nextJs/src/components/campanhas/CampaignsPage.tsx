@@ -26,13 +26,14 @@ type CampaignView = 'list' | 'create' | 'detail';
 type CampaignStatus = 'draft' | 'running' | 'completed' | 'failed';
 type RecipientStatus = 'pending' | 'sent' | 'failed';
 type CreateStep = 0 | 1 | 2;
-type PickerModalType = 'whatsapp' | 'lista' | null;
+type PickerModalType = 'whatsapp' | 'lista' | 'source-connection' | null;
 
 interface WhatsappConnection {
   id: string;
   nome: string;
   numero: string | null;
   status: 'connected' | 'connecting' | 'disconnected';
+  cor?: string | null;
 }
 
 interface ContactList {
@@ -47,6 +48,7 @@ interface CampaignRecipient {
   nome: string;
   whatsapp: string;
   avatar_url: string | null;
+  mensagem_personalizada: string | null;
   status: RecipientStatus;
   error_message: string | null;
 }
@@ -54,7 +56,10 @@ interface CampaignRecipient {
 interface Campaign {
   id: string;
   nome: string;
-  mensagem: string;
+  mensagem: string | null;
+  contexto: string | null;
+  source_type: 'lista' | 'connection';
+  source_whatsapp_connection_id: string | null;
   status: CampaignStatus;
   total_contatos: number;
   enviados_com_sucesso: number;
@@ -66,6 +71,7 @@ interface Campaign {
   created_at: string;
   whatsapp_connections: WhatsappConnection | null;
   contatos_listas: ContactList | null;
+  source_whatsapp_connection?: WhatsappConnection | null;
 }
 
 interface CampaignDetail extends Campaign {
@@ -323,8 +329,10 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState({
     nome: '',
     whatsapp_connection_id: '',
+    source_type: 'lista' as 'lista' | 'connection',
     lista_id: '',
-    mensagem: '',
+    source_whatsapp_connection_id: '',
+    contexto: '',
   });
 
   useEffect(() => {
@@ -352,7 +360,7 @@ export default function CampaignsPage() {
 
   const { data: connections = [] } = useSWR<WhatsappConnection[]>(
     connectionsKey,
-    ([, , uid]) => fetcher<WhatsappConnection[]>('/whatsapp', uid),
+    ([, , uid]) => fetcher<WhatsappConnection[]>('/whatsapp?includeDeleted=all', uid),
     { revalidateOnFocus: false },
   );
 
@@ -405,7 +413,16 @@ export default function CampaignsPage() {
     id: connection.id,
     title: connection.nome,
     subtitle: connection.numero ? `Número conectado: ${connection.numero}` : 'Conexão pronta para disparo',
-    accent: '#22c55e',
+    accent: connection.cor || '#22c55e',
+  }));
+
+  const audienceConnectionOptions: RefinedSelectOption[] = connections.map((connection) => ({
+    id: connection.id,
+    title: connection.nome,
+    subtitle: connection.numero
+      ? `Contatos com conversas nesse número: ${connection.numero}`
+      : 'Usar todos os contatos que já conversaram nessa conexão',
+    accent: connection.cor || '#22c55e',
   }));
 
   const listOptions: RefinedSelectOption[] = lists.map((list) => ({
@@ -418,11 +435,18 @@ export default function CampaignsPage() {
   const selectedConnection = connectedConnections.find(
     (connection) => connection.id === formData.whatsapp_connection_id,
   );
+  const selectedSourceConnection = connections.find(
+    (connection) => connection.id === formData.source_whatsapp_connection_id,
+  );
   const selectedList = lists.find((list) => list.id === formData.lista_id);
   const selectedConnectionOption =
     connectionOptions.find((option) => option.id === formData.whatsapp_connection_id) ?? null;
   const selectedListOption =
     listOptions.find((option) => option.id === formData.lista_id) ?? null;
+  const selectedSourceConnectionOption =
+    audienceConnectionOptions.find(
+      (option) => option.id === formData.source_whatsapp_connection_id,
+    ) ?? null;
 
   const openCreate = () => {
     startTransition(() => {
@@ -453,8 +477,13 @@ export default function CampaignsPage() {
 
     if (!userId) return;
 
-    if (!formData.nome.trim() || !formData.whatsapp_connection_id || !formData.lista_id || !formData.mensagem.trim()) {
-      toast.error('Preencha nome, WhatsApp, lista e mensagem para continuar.');
+    const hasAudience =
+      formData.source_type === 'lista'
+        ? Boolean(formData.lista_id)
+        : Boolean(formData.source_whatsapp_connection_id);
+
+    if (!formData.nome.trim() || !formData.whatsapp_connection_id || !hasAudience || !formData.contexto.trim()) {
+      toast.error('Preencha nome, WhatsApp, origem do público e contexto para continuar.');
       return;
     }
 
@@ -466,8 +495,13 @@ export default function CampaignsPage() {
         userId,
         body: {
           nome: formData.nome.trim(),
-          mensagem: formData.mensagem.trim(),
-          lista_id: formData.lista_id,
+          contexto: formData.contexto.trim(),
+          source_type: formData.source_type,
+          lista_id: formData.source_type === 'lista' ? formData.lista_id : undefined,
+          source_whatsapp_connection_id:
+            formData.source_type === 'connection'
+              ? formData.source_whatsapp_connection_id
+              : undefined,
           whatsapp_connection_id: formData.whatsapp_connection_id,
         },
       });
@@ -475,8 +509,10 @@ export default function CampaignsPage() {
       setFormData({
         nome: '',
         whatsapp_connection_id: '',
+        source_type: 'lista',
         lista_id: '',
-        mensagem: '',
+        source_whatsapp_connection_id: '',
+        contexto: '',
       });
       setCreateStep(0);
 
@@ -512,8 +548,11 @@ export default function CampaignsPage() {
 
   const canAdvanceFromStepOne = formData.nome.trim().length >= 3;
   const canAdvanceFromStepTwo =
-    Boolean(formData.whatsapp_connection_id) && Boolean(formData.lista_id);
-  const canSubmitCampaign = Boolean(formData.mensagem.trim()) && canAdvanceFromStepOne && canAdvanceFromStepTwo;
+    Boolean(formData.whatsapp_connection_id) &&
+    (formData.source_type === 'lista'
+      ? Boolean(formData.lista_id)
+      : Boolean(formData.source_whatsapp_connection_id));
+  const canSubmitCampaign = Boolean(formData.contexto.trim()) && canAdvanceFromStepOne && canAdvanceFromStepTwo;
 
   return (
     <motion.div
@@ -526,7 +565,7 @@ export default function CampaignsPage() {
         <div>
           <h1 className="m-0 text-[clamp(30px,4vw,38px)] leading-[1.05] text-white">Campanhas</h1>
           <p className="mt-2.5 max-w-[760px] text-[15px] leading-7 text-white/55 text-wrap-balance">
-            Monte campanhas com listas de contatos e dispare pelo WhatsApp conectado.
+            Monte campanhas com listas de contatos e dispare mensagens dinâmicas pelo WhatsApp conectado.
           </p>
         </div>
 
@@ -591,12 +630,12 @@ export default function CampaignsPage() {
           )}
         </AnimatePresence>
 
-        <div className="flex flex-1 min-h-0 flex-col p-[18px]">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-[18px]">
           <AnimatePresence mode="wait" initial={false}>
             {view === 'list' && (
               <motion.div
                 key="campaigns-list"
-                className="flex flex-1 min-h-0 flex-col"
+                className="scrollbar-none flex flex-1 min-h-0 flex-col overflow-auto pr-1"
                 variants={sectionEntrance}
                 initial="hidden"
                 animate="visible"
@@ -614,8 +653,8 @@ export default function CampaignsPage() {
                     </div>
                     <h2 className="m-0 text-[28px] text-white">Nenhuma campanha criada ainda</h2>
                     <p className="m-0 max-w-[560px] leading-7 text-white/55">
-                      Crie sua primeira campanha selecionando um WhatsApp conectado, uma lista de contatos e a mensagem
-                      que será enviada. Depois disso, você inicia o disparo quando estiver pronto.
+                      Crie sua primeira campanha selecionando um WhatsApp conectado, uma lista de contatos e o contexto
+                      que vai orientar as mensagens dinâmicas. Depois disso, você inicia o disparo quando estiver pronto.
                     </p>
                     <button
                       className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
@@ -635,7 +674,7 @@ export default function CampaignsPage() {
                     {campaigns.map((campaign) => (
                       <motion.article
                         key={campaign.id}
-                        className="relative flex min-h-[260px] flex-col gap-[18px] overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] p-[22px]"
+                        className="relative flex min-h-[300px] flex-col gap-[18px] overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.02)_100%)] p-[22px]"
                         variants={cardEntrance}
                         whileHover={{ y: -4, scale: 1.01 }}
                         transition={{ duration: 0.18 }}
@@ -660,7 +699,9 @@ export default function CampaignsPage() {
                           </span>
                         </div>
 
-                        <p className="m-0 line-clamp-4 text-[14px] leading-7 text-white/55">{campaign.mensagem}</p>
+                        <p className="m-0 line-clamp-4 text-[14px] leading-7 text-white/55">
+                          {campaign.contexto || campaign.mensagem || 'Campanha sem contexto registrado.'}
+                        </p>
 
                         <div className="flex flex-col gap-2.5">
                           <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
@@ -696,7 +737,7 @@ export default function CampaignsPage() {
             {view === 'create' && (
               <motion.div
                 key="campaigns-create"
-                className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]"
+                className="scrollbar-none grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto pr-1 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]"
                 variants={sectionEntrance}
                 initial="hidden"
                 animate="visible"
@@ -718,7 +759,7 @@ export default function CampaignsPage() {
                     {[
                       { step: 0, title: 'Identidade', hint: 'Nome interno' },
                       { step: 1, title: 'Origem', hint: 'WhatsApp e lista' },
-                      { step: 2, title: 'Mensagem', hint: 'Conteúdo final' },
+                      { step: 2, title: 'Contexto', hint: 'Base para personalização' },
                     ].map((item) => {
                       const isActive = createStep === item.step;
 
@@ -789,7 +830,7 @@ export default function CampaignsPage() {
                             <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Etapa 2</span>
                             <h3 className="mt-3 text-[20px] text-white">Defina a origem do disparo</h3>
                             <p className="mt-2 text-sm leading-6 text-white/55">
-                              Escolha a conexão ativa e a lista de contatos que será base dessa campanha.
+                              Escolha por qual WhatsApp a campanha vai sair e de onde virá o público: por lista ou por uma conexão com histórico de conversas.
                             </p>
                           </div>
 
@@ -801,13 +842,70 @@ export default function CampaignsPage() {
                             onOpen={() => setPickerModal('whatsapp')}
                           />
 
-                          <RefinedSelect
-                            label="Lista de contatos"
-                            placeholder="Escolha a lista que será usada"
-                            value={formData.lista_id}
-                            selectedOption={selectedListOption}
-                            onOpen={() => setPickerModal('lista')}
-                          />
+                          <div className="grid gap-3">
+                            <div className="grid gap-2">
+                              <span className="text-sm font-bold text-white">Origem do público</span>
+                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {[
+                                  {
+                                    id: 'lista' as const,
+                                    title: 'Usar uma lista',
+                                    description: 'Dispara para os contatos já organizados em uma lista.',
+                                  },
+                                  {
+                                    id: 'connection' as const,
+                                    title: 'Usar uma conexão',
+                                    description: 'Dispara para todos os contatos que já conversaram nesse WhatsApp.',
+                                  },
+                                ].map((option) => {
+                                  const isActive = formData.source_type === option.id;
+                                  return (
+                                    <button
+                                      key={option.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setFormData((current) => ({
+                                          ...current,
+                                          source_type: option.id,
+                                          lista_id: option.id === 'lista' ? current.lista_id : '',
+                                          source_whatsapp_connection_id:
+                                            option.id === 'connection'
+                                              ? current.source_whatsapp_connection_id
+                                              : '',
+                                        }))
+                                      }
+                                      className={`rounded-[20px] border px-4 py-4 text-left transition ${
+                                        isActive
+                                          ? 'border-[rgba(242,228,22,0.22)] bg-[rgba(242,228,22,0.08)]'
+                                          : 'border-white/8 bg-white/4 hover:border-white/12 hover:bg-white/6'
+                                      }`}
+                                    >
+                                      <strong className="block text-[15px] text-white">{option.title}</strong>
+                                      <p className="mt-2 text-[13px] leading-6 text-white/55">{option.description}</p>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {formData.source_type === 'lista' ? (
+                              <RefinedSelect
+                                label="Lista de contatos"
+                                placeholder="Escolha a lista que será usada"
+                                value={formData.lista_id}
+                                selectedOption={selectedListOption}
+                                onOpen={() => setPickerModal('lista')}
+                              />
+                            ) : (
+                              <RefinedSelect
+                                label="Conexão de origem do público"
+                                placeholder="Escolha a conexão cujos contatos serão usados"
+                                value={formData.source_whatsapp_connection_id}
+                                selectedOption={selectedSourceConnectionOption}
+                                onOpen={() => setPickerModal('source-connection')}
+                              />
+                            )}
+                          </div>
                         </motion.div>
                       )}
 
@@ -822,25 +920,25 @@ export default function CampaignsPage() {
                         >
                           <div className="rounded-[20px] border border-white/8 bg-white/4 p-4">
                             <span className="text-[12px] uppercase tracking-[0.08em] text-white/35">Etapa 3</span>
-                            <h3 className="mt-3 text-[20px] text-white">Escreva a mensagem base</h3>
+                            <h3 className="mt-3 text-[20px] text-white">Descreva o contexto da campanha</h3>
                             <p className="mt-2 text-sm leading-6 text-white/55">
-                              Revise o conteúdo final antes de salvar. O envio começa quando você iniciar manualmente.
+                              Em vez de uma mensagem fixa, vamos usar esse contexto junto com as últimas conversas de cada contato para gerar mensagens personalizadas.
                             </p>
                           </div>
 
                           <div className="grid gap-2">
-                            <label htmlFor="campaign-message" className="text-sm font-bold text-white">
-                              Mensagem
+                            <label htmlFor="campaign-context" className="text-sm font-bold text-white">
+                              Contexto da campanha
                             </label>
                             <textarea
-                              id="campaign-message"
-                              className="min-h-[160px] w-full resize-y rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm leading-7 text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
-                              placeholder="Olá! Passando para compartilhar uma condição especial..."
-                              value={formData.mensagem}
-                              onChange={(event) => setFormData((current) => ({ ...current, mensagem: event.target.value }))}
+                              id="campaign-context"
+                              className="scrollbar-none scrollbar-track-transparent min-h-[140px] w-full resize-y rounded-2xl border border-white/8 bg-[rgba(7,16,33,0.92)] px-4 py-[15px] text-sm leading-7 text-white outline-none transition focus:border-[rgba(242,228,22,0.35)] focus:shadow-[0_0_0_4px_rgba(242,228,22,0.08)]"
+                              placeholder="Ex: Campanha de Páscoa com foco em aumentar vendas nesta época. Quero uma abordagem calorosa, consultiva e natural. Considere preferências, interesses ou produtos mencionados, sem soar invasivo."
+                              value={formData.contexto}
+                              onChange={(event) => setFormData((current) => ({ ...current, contexto: event.target.value }))}
                               maxLength={3000}
                             />
-                            <span className="text-[12px] text-white/45">{formData.mensagem.length}/3000 caracteres</span>
+                            <span className="text-[12px] text-white/45">{formData.contexto.length}/3000 caracteres</span>
                           </div>
                         </motion.div>
                       )}
@@ -887,7 +985,7 @@ export default function CampaignsPage() {
                   <div>
                     <h2 className="m-0 text-[22px] text-white">Pré-visualização</h2>
                     <p className="mt-2 text-[14px] leading-6 text-white/55">
-                      Confira contexto, lista e mensagem antes de salvar o rascunho.
+                      Confira a conexão de envio, a origem do público e a geração dinâmica antes de salvar o rascunho.
                     </p>
                   </div>
 
@@ -899,36 +997,42 @@ export default function CampaignsPage() {
                       <p className="mt-2 text-[13px] leading-6 text-white/55">
                         {selectedConnection
                           ? `Disparo sairá por ${selectedConnection.numero || 'essa conexão ativa'}.`
-                          : 'Selecione uma conexão ativa para habilitar o disparo quando a campanha for iniciada.'}
+                          : 'Conexão para habilitar o disparo quando a campanha for iniciada.'}
                       </p>
                     </div>
                     <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
                       <strong className="block text-[15px] text-white">
-                        {selectedList?.nome || 'Lista ainda não selecionada'}
+                        {formData.source_type === 'lista'
+                          ? selectedList?.nome || 'Lista ainda não selecionada'
+                          : selectedSourceConnection?.nome || 'Conexão de público ainda não selecionada'}
                       </strong>
                       <p className="mt-2 text-[13px] leading-6 text-white/55">
-                        {selectedList
-                          ? `A lista atual possui ${selectedList.cards?.length || 0} contato(s) vinculados.`
-                          : 'Escolha a lista de contatos que será congelada como base da campanha no momento da criação.'}
+                        {formData.source_type === 'lista'
+                          ? selectedList
+                            ? `A lista atual possui ${selectedList.cards?.length || 0} contato(s) vinculados.`
+                            : 'Lista de contatos que será base da campanha no momento da criação.'
+                          : selectedSourceConnection
+                            ? 'Vamos usar todos os contatos que já tiveram conversas nessa conexão.'
+                            : 'Conexão cuja base de conversas será usada como público da campanha.'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-white/55">
                     <span>{formData.nome.trim() || 'Novo rascunho de campanha'}</span>
-                    <span>{formData.mensagem.length} caracteres</span>
+                    <span>{formData.contexto.length} caracteres</span>
                   </div>
 
                   <div className="rounded-[22px_22px_22px_10px] bg-[linear-gradient(135deg,rgba(18,105,244,0.24)_0%,rgba(12,67,157,0.45)_100%)] p-[18px] text-white">
-                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-7">
-                      {formData.mensagem.trim() || 'Sua mensagem aparecerá aqui para revisão rápida antes de salvar o rascunho.'}
+                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-7 text-balance ">
+                      {formData.contexto.trim() || 'O contexto da campanha aparecerá aqui. Cada destinatário recebe uma mensagem personalizada com base no briefing e no histórico recente da conversa.'}
                     </p>
                   </div>
 
                   <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
                     <strong className="block text-[15px] text-white">Fluxo da operação</strong>
                     <p className="mt-2 text-[13px] leading-6 text-white/55">
-                      Primeiro você salva a campanha. Depois, na tela de detalhes, inicia o envio. A execução acontece de forma assíncrona no Nest e os contadores são atualizados via realtime.
+                      Primeiro você salva o rascunho. Depois, na tela de detalhes, inicia o envio. Para cada contato, vamos combinar o briefing com as últimas conversas dele para gerar a mensagem final.
                     </p>
                   </div>
                 </motion.aside>
@@ -1046,25 +1150,25 @@ export default function CampaignsPage() {
                     </motion.div>
 
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-                      <div className="flex min-h-0 flex-col gap-4">
+                      <div className="flex min-h-[630px] flex-col gap-4">
                         <motion.div
                           className="rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
                           variants={cardEntrance}
                         >
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="m-0 text-[18px] text-white">Mensagem da campanha</h3>
+                            <h3 className="m-0 text-[18px] text-white">Contexto da campanha</h3>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5 text-[12px] font-bold text-white/70">
                               <Send size={12} />
-                              Conteúdo congelado no rascunho
+                              Base para geração dinâmica
                             </span>
                           </div>
                           <p className="m-0 whitespace-pre-wrap break-words text-sm leading-8 text-white">
-                            {campaignDetail.mensagem}
+                            {campaignDetail.contexto || campaignDetail.mensagem || 'Sem contexto registrado.'}
                           </p>
                         </motion.div>
 
                         <motion.div
-                          className="flex min-h-0 flex-col rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
+                          className="flex min-h-[500px] flex-col rounded-[20px] border border-white/8 bg-white/5 p-[18px]"
                           variants={cardEntrance}
                         >
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1098,6 +1202,11 @@ export default function CampaignsPage() {
                                   <div className="min-w-0">
                                     <strong className="block truncate text-sm text-white">{recipient.nome}</strong>
                                     <span className="mt-1 block text-[13px] text-white/55">{recipient.whatsapp}</span>
+                                    {recipient.mensagem_personalizada && (
+                                      <p className="mt-2 rounded-[16px] border border-white/8 bg-white/5 px-3 py-2 text-[12px] leading-6 text-white/72">
+                                        {recipient.mensagem_personalizada}
+                                      </p>
+                                    )}
                                     {recipient.error_message && (
                                       <span className="mt-1 block text-[12px] leading-5 text-[#ffb2b2]">
                                         {recipient.error_message}
@@ -1131,7 +1240,12 @@ export default function CampaignsPage() {
                           <div className="grid gap-3">
                             {[
                               ['WhatsApp', campaignDetail.whatsapp_connections?.nome || 'Não encontrado'],
-                              ['Lista', campaignDetail.contatos_listas?.nome || 'Não encontrada'],
+                              [
+                                'Origem do público',
+                                campaignDetail.source_type === 'connection'
+                                  ? campaignDetail.source_whatsapp_connection?.nome || 'Conexão não encontrada'
+                                  : campaignDetail.contatos_listas?.nome || 'Lista não encontrada',
+                              ],
                               ['Criada em', formatDate(campaignDetail.created_at)],
                               ['Iniciada em', formatDate(campaignDetail.started_at)],
                               ['Finalizada em', campaignDetail.completed_at ? formatDate(campaignDetail.completed_at) : 'Ainda processando'],
@@ -1178,6 +1292,19 @@ export default function CampaignsPage() {
         onClose={() => setPickerModal(null)}
         onSelect={(value) =>
           setFormData((current) => ({ ...current, lista_id: value }))
+        }
+      />
+
+      <SelectionModal
+        isOpen={pickerModal === 'source-connection'}
+        title="Escolher conexão de público"
+        subtitle="Selecione a conexão cujos contatos com conversas serão usados como público desta campanha."
+        options={audienceConnectionOptions}
+        value={formData.source_whatsapp_connection_id}
+        emptyMessage="Nenhuma conexão disponível para usar como origem do público."
+        onClose={() => setPickerModal(null)}
+        onSelect={(value) =>
+          setFormData((current) => ({ ...current, source_whatsapp_connection_id: value }))
         }
       />
     </motion.div>

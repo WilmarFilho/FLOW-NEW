@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -27,8 +28,13 @@ export class WhatsappController {
    */
   @Get()
   @UseGuards(AdminGuard)
-  async listConnections(@CurrentUserId() userId: string) {
-    return this.whatsappService.listConnections(userId);
+  async listConnections(
+    @CurrentUserId() userId: string,
+    @Query('includeDeleted') includeDeleted?: string,
+  ) {
+    return this.whatsappService.listConnections(userId, {
+      includeDeleted: includeDeleted === 'all',
+    });
   }
 
   /**

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
+import { LogsService } from '../../logs/logs.service';
 
 type WebhookRequest = Request & {
   body?: {
@@ -33,7 +34,10 @@ type WebhookRequest = Request & {
 export class WhatsappWebhookGuard implements CanActivate {
   private readonly logger = new Logger(WhatsappWebhookGuard.name);
 
-  constructor(private readonly configService: ConfigService) { }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly logsService: LogsService,
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<WebhookRequest>();
@@ -42,15 +46,25 @@ export class WhatsappWebhookGuard implements CanActivate {
       ?.trim();
 
     if (!configuredApiKey) {
-      this.logger.warn(
-        'EVOLUTION_API_KEY não configurada. Permitindo requisição sem validação.',
-      );
+      await this.logsService.warn({
+        action: 'whatsapp.webhook.auth',
+        context: WhatsappWebhookGuard.name,
+        message:
+          'EVOLUTION_API_KEY não configurada. Permitindo requisição sem validação.',
+      });
       return true;
     }
 
     const headerSecret = this.extractSecret(request);
     if (!headerSecret) {
-      this.logger.warn('Webhook bloqueado por API key ausente.');
+      await this.logsService.warn({
+        action: 'whatsapp.webhook.auth',
+        context: WhatsappWebhookGuard.name,
+        message: 'Webhook bloqueado por API key ausente.',
+        metadata: {
+          instance: typeof request.body?.instance === 'string' ? request.body.instance : null,
+        },
+      });
       throw new HttpException('Webhook não autorizado.', HttpStatus.UNAUTHORIZED);
     }
 
@@ -91,11 +105,19 @@ export class WhatsappWebhookGuard implements CanActivate {
         return true;
       }
 
-      this.logger.warn(
-        `Webhook bloqueado por API key inválida. Global e instância não bateram para ${instanceName}.`,
-      );
+      await this.logsService.warn({
+        action: 'whatsapp.webhook.auth',
+        context: WhatsappWebhookGuard.name,
+        message: `Webhook bloqueado por API key inválida. Global e instância não bateram para ${instanceName}.`,
+        metadata: { instanceName },
+      });
     } else {
-      this.logger.warn('Webhook bloqueado por API key inválida e sem instance no payload.');
+      await this.logsService.warn({
+        action: 'whatsapp.webhook.auth',
+        context: WhatsappWebhookGuard.name,
+        message:
+          'Webhook bloqueado por API key inválida e sem instance no payload.',
+      });
     }
 
     throw new HttpException('Webhook não autorizado.', HttpStatus.UNAUTHORIZED);
@@ -223,9 +245,12 @@ export class WhatsappWebhookGuard implements CanActivate {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.warn(
-          `Webhook auth debug: fetchInstanceApiKey non-ok body=${errorText}`,
-        );
+        await this.logsService.warn({
+          action: 'whatsapp.webhook.fetchInstanceApiKey',
+          context: WhatsappWebhookGuard.name,
+          message: 'Webhook auth debug: fetchInstanceApiKey retornou resposta não-ok.',
+          metadata: { errorText, instanceName, status: response.status },
+        });
         return null;
       }
 
@@ -241,8 +266,14 @@ export class WhatsappWebhookGuard implements CanActivate {
 
       const first = Array.isArray(payload) ? payload[0] : null;
       return first?.instance?.apikey?.trim() || null;
-    } catch {
-      this.logger.warn('Webhook auth debug: fetchInstanceApiKey threw exception.');
+    } catch (error) {
+      await this.logsService.warn({
+        action: 'whatsapp.webhook.fetchInstanceApiKey',
+        context: WhatsappWebhookGuard.name,
+        error,
+        message: 'Webhook auth debug: fetchInstanceApiKey threw exception.',
+        metadata: { instanceName },
+      });
       return null;
     }
   }

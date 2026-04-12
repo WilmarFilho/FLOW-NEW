@@ -9,6 +9,7 @@ import { ConversasService } from '../conversas/conversas.service';
 export type WhatsappConnectionRecord = {
   id?: string;
   nome?: string;
+  cor?: string;
   numero?: string;
   status?: string;
   instance_name?: string;
@@ -35,17 +36,31 @@ export class WhatsappService {
   /**
    * Lista todas as conexões de um usuário
    */
-  async listConnections(userId: string) {
-    const { data, error } = await this.supabaseService
+  async listConnections(
+    userId: string,
+    options?: { includeDeleted?: boolean },
+  ) {
+    const query = this.supabaseService
       .getClient()
       .from('whatsapp_connections')
       .select('*, agentes_ia(id, nome), conhecimentos(id, titulo)')
       .eq('user_id', userId)
-      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
+    if (!options?.includeDeleted) {
+      query.is('deleted_at', null);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      this.logger.error(`Failed to list connections: ${error.message}`);
+      await this.logsService.error({
+        action: 'whatsapp.listConnections',
+        context: WhatsappService.name,
+        error,
+        message: `Failed to list connections: ${error.message}`,
+        user_id: userId,
+      });
       throw error;
     }
 
@@ -82,6 +97,7 @@ export class WhatsappService {
       const insertData: Record<string, any> = {
         user_id: dto.user_id,
         nome: dto.nome,
+        cor: dto.cor || '#22c55e',
         numero: dto.numero || '',
         status: 'connecting',
         instance_name: instanceName,
@@ -155,6 +171,7 @@ export class WhatsappService {
       ultima_atualizacao: new Date().toISOString(),
     };
     if (dto.nome !== undefined) updateData.nome = dto.nome;
+    if (dto.cor !== undefined) updateData.cor = dto.cor || '#22c55e';
     if (dto.agente_id !== undefined) updateData.agente_id = dto.agente_id || null;
     if (dto.conhecimento_id !== undefined) updateData.conhecimento_id = dto.conhecimento_id || null;
     if (dto.business_hours !== undefined) updateData.business_hours = dto.business_hours;
@@ -173,7 +190,14 @@ export class WhatsappService {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to update connection: ${error.message}`);
+      await this.logsService.error({
+        action: 'whatsapp.updateConnection',
+        context: WhatsappService.name,
+        error,
+        message: `Failed to update connection: ${error.message}`,
+        metadata: { connectionId: id },
+        user_id: userId,
+      });
       throw error;
     }
 
@@ -260,7 +284,14 @@ export class WhatsappService {
       .eq('user_id', userId);
 
     if (error) {
-      this.logger.error(`Failed to delete connection: ${error.message}`);
+      await this.logsService.error({
+        action: 'whatsapp.deleteConnection',
+        context: WhatsappService.name,
+        error,
+        message: `Failed to delete connection: ${error.message}`,
+        metadata: { connectionId: id },
+        user_id: userId,
+      });
       throw error;
     }
 
@@ -376,7 +407,13 @@ export class WhatsappService {
     console.log(updateData);
 
     if (error) {
-      this.logger.error(`Webhook update failed: ${error.message}`);
+      await this.logsService.error({
+        action: 'whatsapp.handleWebhook',
+        context: WhatsappService.name,
+        error,
+        message: `Webhook update failed: ${error.message}`,
+        metadata: { instanceName },
+      });
       return { processed: false, error: error.message };
     }
 
