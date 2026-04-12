@@ -124,5 +124,5 @@ Na VPS faça:
 cd /root
 git clone https://github.com/WilmarFilho/FLOW-NEW.git FLOW
 cd FLOW
-# Apenas a partir do segundo commit a action fará tudo no auto-pilot.
+# Apenas a partir do segundo commit a action fará tudo no auto-pilot..
 ```
