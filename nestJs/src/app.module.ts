@@ -17,11 +17,13 @@ import { GoogleModule } from './google/google.module';
 import { CampanhasModule } from './campanhas/campanhas.module';
 import { ConversasModule } from './conversas/conversas.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-
 import { ContatosModule } from './contatos/contatos.module';
+import { StripeModule } from './stripe/stripe.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     SupabaseModule,
     LogsModule,
@@ -37,6 +39,7 @@ import { ContatosModule } from './contatos/contatos.module';
     CampanhasModule,
     ConversasModule,
     DashboardModule,
+    StripeModule,
   ],
   controllers: [AppController],
   providers: [

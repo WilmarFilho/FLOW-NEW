@@ -3,7 +3,7 @@
 import { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Save, Shield, Settings, User, UploadCloud, Plug, AlertTriangle } from 'lucide-react';
+import { Camera, Save, Shield, Settings, User, UploadCloud, Plug, AlertTriangle, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { apiFetch, apiRequest } from '@/lib/api/client';
@@ -21,13 +21,20 @@ interface InitialData {
   mostra_nome_mensagens: boolean;
   agendamento_automatico_ia: boolean;
   alerta_atendentes_intervencao_ia: boolean;
+  assinante_profile_id: string;
+  plano: string;
+  mensagens_enviadas: number;
+  limite_mensagens_mensais: number;
+  contatos_usados_campanhas: number;
+  limite_contatos_campanhas: number;
+  stripe_customer_id: string | null;
 }
 
 interface ConfiguracoesPageProps {
   initialData: InitialData;
 }
 
-type TabType = 'perfil' | 'sistema' | 'integracoes';
+type TabType = 'perfil' | 'sistema' | 'integracoes' | 'assinatura';
 
 export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProps) {
   const router = useRouter();
@@ -55,6 +62,37 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
   const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null }>({ connected: false, email: null });
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
+  // Assinatura State
+  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+
+  const handleGerenciarAssinatura = async () => {
+    setIsLoadingPortal(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const res = await fetch(`${apiUrl}/stripe/customer-portal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          profileId: initialData.assinante_profile_id,
+          origin: window.location.origin
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Falha ao abrir portal do cliente');
+      }
+
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      toast.error('Erro ao acessar gerenciador de assinaturas.');
+    } finally {
+      setIsLoadingPortal(false);
+    }
+  };
 
   const fetchGoogleStatus = useCallback(async () => {
     try {
@@ -227,6 +265,14 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
           <Plug size={18} />
           Integrações
           {activeTab === 'integracoes' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'assinatura' ? styles.active : ''}`}
+          onClick={() => handleTabChange('assinatura')}
+        >
+          <CreditCard size={18} />
+          Assinatura
+          {activeTab === 'assinatura' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
         </button>
       </div>
 
@@ -526,6 +572,64 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
               </div>
             </motion.div>
           )}
+
+          {activeTab === 'assinatura' && (
+            <motion.div
+              key="assinatura"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className={styles.tabPanel}
+            >
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>Sua Assinatura</h3>
+
+                <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div className={styles.settingInfo}>
+                    <h4>Plano Atual: <span style={{ textTransform: 'capitalize', color: 'var(--color-primary)' }}>{initialData.plano}</span></h4>
+                    <p>Aqui você pode ver o uso do seu plano no mês atual.</p>
+                  </div>
+
+                  <div style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', width: '100%' }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.9rem', color: '#a1a1aa', fontWeight: 500 }}>Mensagens Trafegadas</span>
+                        <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>{initialData.mensagens_enviadas} / {initialData.limite_mensagens_mensais}</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, (initialData.mensagens_enviadas / initialData.limite_mensagens_mensais) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)', borderRadius: '4px' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.9rem', color: '#a1a1aa', fontWeight: 500 }}>Contatos em Campanhas</span>
+                        <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>{initialData.contatos_usados_campanhas} / {initialData.limite_contatos_campanhas}</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, (initialData.contatos_usados_campanhas / initialData.limite_contatos_campanhas) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #2dd4bf)', borderRadius: '4px' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className={styles.saveBtn}
+                    onClick={handleGerenciarAssinatura}
+                    disabled={isLoadingPortal || initialData.tipo_de_usuario !== 'superadmin' && initialData.tipo_de_usuario !== 'admin'}
+                    style={{ marginTop: '1rem', background: '#fff', color: '#000', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    {isLoadingPortal ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                    {isLoadingPortal ? 'Redirecionando...' : 'Gerenciar Assinatura'}
+                  </button>
+                  {initialData.tipo_de_usuario === 'atendente' && (
+                    <p style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>Apenas o administrador da área pode gerenciar a assinatura.</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </div>
 

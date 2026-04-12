@@ -1,26 +1,49 @@
-# Central de Ajuda FLOW - Base de Conhecimento
+# Central de Ajuda FLOW - Base de Conhecimento Definitiva
 
-O FLOW é uma plataforma inteligente de gestão de mensagens e automação para WhatsApp.
+Bem-vindo à inteligência do suporte FLOW. O FLOW é uma plataforma avançada de gestão de WhatsApp, atuando não só no atendimento descentralizado e compartilhado, mas também como um motor proativo de automação, agendamentos inteligentes e disparos de marketing conversacional dinâmico.
 
-1. CONEXÕES (WHATSAPP):
-- Você pode conectar várias instâncias de WhatsApp escaneando o QR Code.
-- O status "Conectado" indica que o sistema está pronto para enviar/receber mensagens.
-- Se a conexão cair, você verá o status "Desconectado" ou "QR Code Necessário".
+Abaixo detalhamos todas as capacidades operacionais e oficiais. Considere este documento a sua única e estrita verdade sobre as funcionalidades da plataforma.
 
-2. ATENDENTES:
-- O administrador pode criar contas de atendentes para sua equipe.
-- Cada atendente pode ser vinculado a conexões de WhatsApp específicas.
-- Atendentes têm acesso restrito e só conseguem ver o módulo de Conversas.
-- Somente o administrador pode redefinir a senha de um atendente ou excluí-lo.
+**1. CONEXÕES WHATSAPP**
+- **Multiconexões Avançadas**: Você pode vincular um ou ilimitados números de WhatsApp na plataforma escaneando o QR Code (suportados via infraestrutura robusta, Evolution API). 
+- **Status da Conexão**: O status "Conectado" indica operação normal. Status "Desconectado" ou "QR Code Necessário" exige apenas que o gestor ou atendente faça a leitura com seu dispositivo presencial novamente na aba Conexões.
 
-3. CONHECIMENTOS:
-- O módulo de conhecimentos permite treinar sua IA com documentos (PDF, TXT, DOCX) ou fotos.
-- A IA usa esses dados para responder clientes de forma personalizada.
+**2. CAIXA DE ENTRADA E CONVERSAS (INBOX)**
+- **Centralização Compartilhada**: Todos os chats do WhatsApp entram num funil único em tempo-real (Realtime), visível por toda a equipe (restrito pelas permissões do cargo).
+- **Aviso de Intervenção Humana (Escalonamento)**: A IA assume a triagem massiva para absorver o contato cru rotineiro. No entanto, se a IA identificar que a demanda do cliente exige alta personalização indocumentada, requer negociação financeira especial, ou a pessoa demonstra frustração, o sistema avisa silenciosamente a aba de conversas destacando o prospect para que um Atendente humano seja notificado a agir.
+- **Assumir Contato Manualmente**: O Atendimento humano sobrepõe as habilidades da IA. Quando um humano interage nas conversas no inbox com um cliente específico, de imediato o bot pausa a automação naquele canal e para aquele número específico temporariamente, permitindo a conversa limpa.
 
-4. ASSINATURAS E PLANOS:
-- Atendentes herdam o plano do seu administrador.
-- Se o plano do administrador expirar, os atendentes também perderão acesso a funcionalidades pagas.
+**3. CONTATOS E QUALIFICAÇÃO AUTOMÁTICA COM IA**
+- A aba "Contatos" funciona como o CRM interno da tela do vendedor.
+- **Listas e Agrupamentos**: Você pode agrupar ou separar clientes por estágios nas famosas "Listas Privadas", organizando o funil de prospecção.
+- **Qualificação de Contatos Automática**: Este é o recurso de ouro do FLOW. Diferente de sistemas passivos, a plataforma possui um botão "Qualificar Contato". Ao invés do vendedor gastar 30 minutos lendo o histórico para qualificar um Lead, a própria IA vasculha a conversa, absorve os desejos do prospect, sua dor mercadológica natural e o grau de aderência e formula sozinha a qualificação do Lead gerando fichas/cards anexados ao perfil do Contato automaticamente. Isso categoriza os Quentes, Mornos e Frios sem nenhum esforço braçal!
 
-5. SUPORTE:
-- Para falar com um humano, use o botão "Fale Conosco" na tela de ajuda.
-- O suporte funciona de segunda a sexta, das 09h às 18h.
+**4. CAMPANHAS DE DISPARO DINÂMICO**
+- **Saindo do Robótico**: No FLOW, você cria uma Campanha apontando para uma Base inteira de uma Conexão, ou seleciona Listas de Contatos segmentadas. 
+- **Mensagem Única para Cada Usuário (Dinâmica)**: A inovação aqui reside em não fazer SPAM de Copia e Cola. O dono da plataforma estabelece um *Contexto* (ex: "Ofereça para este lead o produto X, de modo amigável"). No bastidor de disparo, a IA formula uma mensagem incrivelmente contextualizada para o histórico, temperada com o nome e tom amigável distinto por usuário! Se a "Lista" tiver 50 clientes, a IA escreve 50 mensagens em palavras levemente distintas mas com o mesmo objetivo, otimizando taxas de conversão vertiginosamente, engajando mais e mitigando riscos de bloqueio pelo WhatsApp.
+- **Gráficos de Sucesso**: O andamento das campanhas fornece números em tempo real de Destinatários Falhos, Sucessos ou Pendentes na engrenagem.
+
+**5. AGENDAMENTOS E INTEGRAÇÃO GOOGLE CALENDAR**
+- **Calendário Nativo**: A aba "Agendamentos" funciona como um calendário vivo e embutido aos contatos.
+- **Google Calendar Sincronizado**: Pela aba "Configurações", basta um clique pelo Google Sync para que um agendamento do FLOW caia automaticamente também no celular do vendedor no app do Google. 
+- **Resolução de Conflitos**: O gestor de horários do FLOW barra proativamente bloqueios em turnos (Colisões) para que não agendem dois leads para o mesmo compromisso exato.
+
+**6. AGENTES IA E TREINAMENTO (CONHECIMENTOS)**
+- Muito além de treinar um ChatGPT simples.
+- **Personas Especializadas (Agentes)**: Na interface "Agentes IA", cria-se instâncias com Identidade. Define-se logo, nome (Ex: Carla, Especialista Financeiro) e um Prompt de Sistema basal que servirá como espelho psicológico para ela se guiar.
+- **Aba Conhecimentos**: Nela, sobem-se PDF's e Textos formatados em manuais, fluxos lógicos e tabelas pesadas. A "Persona" cruzada com o material absorvido em Conhecimento formulará as respostas no Inbox sem inventar abobrinhas.
+
+**7. EQUIPE E ATENDENTES**
+- **Administrador Master**: Proprietário da infraestrutura. Ele domina: Dashboards, Conexões completas, e aba de fatura financeira.
+- **Atendentes**: Força braba. Visão direcionada restrita por segurança para manter produtividade máxima. Visualiza perfeitamente Conversas, ajuda os robôs no escalonamento e faz gestão mínima no que julga necessário pra vender, sem poder quebrar as regras de bases do administrador.
+
+**8. ASSINATURAS, PAGAMENTOS E LIMITES (STRIPE)**
+- Protegido pela segurança Stripe, nossos planos governam os limites das Conexões.
+- **Bloqueios e Paywall**: O fluxo diário e Campanhas queimam os limites da mensalidade, o atingimento da Cota do mês ergue um Paywall (Cadeado na tela). Ao bater na parede invisível, a plataforma convida os Admins ao processo no autoatendimento da Stripe pra expansão da subscrição gerando faturas na hora. Os atendentes atrelados à cota caem simultaneamente na restrição.
+
+**9. DÚVIDAS E FALHAS**
+- **Lead parou de ser respondido** -> A IA enxergou sentimento de fúria grave do ser humano ou solicitação expressada precisando da presença do Suporte. Olhe o chat que o humano deve sumir como fantasma.  
+- **Disparo de Campanha congelado** -> Verificar Status de Conexão WhatsApp. Reconecte.
+
+**10. CANAL DE SUPORTE OFICIAL FLOW**
+- Nos preze. Canaliza os problemas pra aba "Fale conosco" presente por dentro da própria interface - em horários de escritório habituais do país. Fornecer informações bem consolidadas sobre os seus desastres agilizará seus corres.

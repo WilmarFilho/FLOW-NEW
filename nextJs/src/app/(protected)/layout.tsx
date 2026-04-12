@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Sidebar from '@/components/layout/Sidebar';
 import RoleGuard from '@/components/auth/RoleGuard';
+import PaywallModal from '@/components/paywall/PaywallModal';
 import styles from './layout.module.css';
 
 export default async function ProtectedLayout({
@@ -45,16 +46,11 @@ export default async function ProtectedLayout({
     .eq('auth_id', user.id)
     .single();
 
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plano')
-    .eq('profile_id', user.id)
-    .single();
-
   const tipoUsuario = profile?.tipo_de_usuario || 'admin';
 
-  // Atendente herda o plano do seu admin
-  let planoAtivo = subscription?.plano || 'freemium';
+  // Busca assinatura
+  let assinanteProfileId = user.id;
+  
   if (tipoUsuario === 'atendente') {
     const { data: atendente } = await supabase
       .from('atendentes')
@@ -63,14 +59,28 @@ export default async function ProtectedLayout({
       .single();
 
     if (atendente?.admin_id) {
-      const { data: adminSub } = await supabase
-        .from('subscriptions')
-        .select('plano')
-        .eq('profile_id', atendente.admin_id)
-        .single();
-      planoAtivo = adminSub?.plano || 'freemium';
+      assinanteProfileId = atendente.admin_id;
     }
   }
+
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('profile_id', assinanteProfileId)
+    .single();
+
+  const planoAtivo = subscription?.plano || 'freemium';
+  const usedMessages = subscription?.mensagens_enviadas || 0;
+  const maxMessages = subscription?.limite_mensagens_mensais || 500;
+  const usedContacts = subscription?.contatos_usados_campanhas || 0;
+  const maxContacts = subscription?.limite_contatos_campanhas || 100;
+
+  const hitMessageLimit = usedMessages >= maxMessages;
+  const hitContactLimit = usedContacts >= maxContacts;
+
+  let paywallReason = '';
+  if (hitMessageLimit) paywallReason = `Você já enviou ${usedMessages} de ${maxMessages} mensagens.`;
+  else if (hitContactLimit) paywallReason = `Você já usou ${usedContacts} de ${maxContacts} contatos em campanhas.`;
 
   return (
     <div style={{
@@ -80,6 +90,11 @@ export default async function ProtectedLayout({
       color: '#fff'
     }}>
       <RoleGuard tipoUsuario={tipoUsuario} />
+      
+      {paywallReason ? (
+        <PaywallModal reason={paywallReason} profileId={assinanteProfileId} />
+      ) : null}
+
       <Sidebar user={{
         nome_completo: profile?.nome_completo || user.email?.split('@')[0],
         email: user.email,

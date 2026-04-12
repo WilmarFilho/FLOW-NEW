@@ -543,6 +543,9 @@ export class CampanhasService {
               falhas,
               pendentes,
             });
+
+            // Increment usage
+            await client.rpc('increment_contatos_campanhas', { p_profile_id: userId });
           } else {
             falhas += 1;
             pendentes -= 1;

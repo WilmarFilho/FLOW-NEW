@@ -805,6 +805,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         updated_at: now,
       })
       .eq('id', params.conversation.id);
+
+    // Call RPC to increment usage limit
+    await this.supabaseService
+      .getClient()
+      .rpc('increment_mensagens_enviadas', { p_profile_id: params.conversation.profile_id });
   }
 
   private async getSenderProfilePreferences(userId: string) {
