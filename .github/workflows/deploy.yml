@@ -27,26 +27,33 @@ jobs:
           host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # ⚠️ ESSENCIAL: faz o job falhar se qualquer comando do script falhar
+          script_stop: true
           script: |
-            # Navega até a pasta do projeto (ajuste o caminho se necessário)
-            # EX: cd /home/usuario/FLOW
+            set -e
+
             cd /root/FLOW
-            
+
             # Puxa o código mais recente
             git pull origin main
-            
-            # Atualiza o arquivo .env com o secret do github
-            # Isso requer que você crie o Secret "ENV_PROD" no GitHub 
-            # com o conteúdo do seu .env da produção (Next, Nest e demais envs unificadas se desejar ou usar separado)
+
+            # Injeta o .env de produção a partir do GitHub Secret ENV_PROD
             echo "${{ secrets.ENV_PROD }}" > .env
-            
-            # Se preferir usar ENV_NEXT_PROD e ENV_NEST_PROD separados (remova echo acima):
-            # echo "${{ secrets.ENV_NEXT_PROD }}" > nextJs/.env
-            # echo "${{ secrets.ENV_NEST_PROD }}" > nestJs/.env
-            
-            # Reconstrói e sobe os conteineres em background
+
+            # Reconstrói e sobe os conteineres (falha se o build falhar)
             docker compose down
-            docker compose up -d --build
-            
-            # Limpa imagens antigas não utilizadas pelo docker para evitar consumo de disco
+            docker compose up -d --build 2>&1 | tee /tmp/deploy.log
+
+            # Verifica se algum container saiu com erro após subir
+            sleep 5
+            FAILED=$(docker compose ps --filter "status=exited" --format "{{.Name}}" 2>/dev/null || true)
+            if [ -n "$FAILED" ]; then
+              echo "❌ Containers com falha: $FAILED"
+              docker compose logs --tail=50
+              exit 1
+            fi
+
+            echo "✅ Deploy concluido com sucesso!"
+
+            # Limpa imagens antigas não utilizadas
             docker image prune -f

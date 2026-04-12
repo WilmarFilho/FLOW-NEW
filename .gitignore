@@ -1,5 +1,9 @@
-logs
+# Logs de runtime (arquivos e pastas de log gerados em producao)
+logs/
 *.log
+# MAS mantem o modulo NestJS de logs no source
+!nestJs/src/logs/
+!nestJs/src/logs/**
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
