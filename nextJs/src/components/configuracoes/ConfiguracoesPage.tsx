@@ -73,7 +73,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
       const res = await fetch(`${apiUrl}/stripe/customer-portal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           profileId: initialData.assinante_profile_id,
           origin: window.location.origin
         }),
@@ -587,7 +587,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
                 <div className={styles.settingItem} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
                   <div className={styles.settingInfo}>
-                    <h4>Plano Atual: <span style={{ textTransform: 'capitalize', color: 'var(--color-primary)' }}>{initialData.plano}</span></h4>
+                    <h4>Plano <span style={{ textTransform: 'capitalize', }}>{initialData.plano}</span></h4>
                     <p>Aqui você pode ver o uso do seu plano no mês atual.</p>
                   </div>
 
@@ -598,7 +598,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                         <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>{initialData.mensagens_enviadas} / {initialData.limite_mensagens_mensais}</span>
                       </div>
                       <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, (initialData.mensagens_enviadas / initialData.limite_mensagens_mensais) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #a855f7)', borderRadius: '4px' }} />
+                        <div style={{ width: `${Math.min(100, (initialData.mensagens_enviadas / initialData.limite_mensagens_mensais) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #3b82f6)', borderRadius: '4px' }} />
                       </div>
                     </div>
 
@@ -608,7 +608,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                         <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>{initialData.contatos_usados_campanhas} / {initialData.limite_contatos_campanhas}</span>
                       </div>
                       <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, (initialData.contatos_usados_campanhas / initialData.limite_contatos_campanhas) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #2dd4bf)', borderRadius: '4px' }} />
+                        <div style={{ width: `${Math.min(100, (initialData.contatos_usados_campanhas / initialData.limite_contatos_campanhas) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #3b82f6)', borderRadius: '4px' }} />
                       </div>
                     </div>
                   </div>

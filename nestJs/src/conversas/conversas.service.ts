@@ -430,6 +430,19 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     const conversa = await this.getAccessibleConversa(userId, conversaId);
+
+    const { data: subscription } = await this.supabaseService.getClient()
+      .from('subscriptions')
+      .select('limite_mensagens_mensais, mensagens_enviadas')
+      .eq('profile_id', conversa.profile_id)
+      .single();
+
+    if (subscription) {
+      if ((subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500)) {
+        throw new BadRequestException('Seu limite de mensagens mensais foi atingido. O administrador da conta precisa realizar um upgrade de plano.');
+      }
+    }
+
     this.assertManualReplyAllowed(conversa);
 
     const manualContext = await this.prepareManualOutboundContext(
@@ -488,6 +501,19 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     const conversa = await this.getAccessibleConversa(userId, conversaId);
+
+    const { data: subscription } = await this.supabaseService.getClient()
+      .from('subscriptions')
+      .select('limite_mensagens_mensais, mensagens_enviadas')
+      .eq('profile_id', conversa.profile_id)
+      .single();
+
+    if (subscription) {
+      if ((subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500)) {
+        throw new BadRequestException('Seu limite de mensagens mensais foi atingido. O administrador da conta precisa realizar um upgrade de plano.');
+      }
+    }
+
     this.assertManualReplyAllowed(conversa);
     const manualContext = await this.prepareManualOutboundContext(
       conversa,
@@ -1807,6 +1833,18 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
       if (!conversation.ai_enabled) {
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'ai_disabled' });
+        await this.finishBatch(batch.id);
+        return;
+      }
+
+      const { data: subscription } = await this.supabaseService.getClient()
+        .from('subscriptions')
+        .select('limite_mensagens_mensais, mensagens_enviadas')
+        .eq('profile_id', conversation.profile_id)
+        .single();
+
+      if (subscription && (subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500)) {
+        this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'plan_limits_reached' });
         await this.finishBatch(batch.id);
         return;
       }

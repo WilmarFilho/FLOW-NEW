@@ -133,6 +133,18 @@ export class CampanhasService {
 
     const client = this.supabaseService.getClient();
 
+    const { data: subscription } = await client
+      .from('subscriptions')
+      .select('limite_contatos_campanhas, contatos_usados_campanhas')
+      .eq('profile_id', userId)
+      .single();
+
+    if (subscription) {
+      if ((subscription.contatos_usados_campanhas || 0) >= (subscription.limite_contatos_campanhas || 100)) {
+        throw new BadRequestException('Seu limite de contatos em campanhas foi atingido. O administrador da conta precisa realizar um upgrade de plano.');
+      }
+    }
+
     const { data: connection, error: connectionError } = await client
       .from('whatsapp_connections')
       .select('id, nome, status')
@@ -369,6 +381,18 @@ export class CampanhasService {
       throw new BadRequestException(
         'Esta campanha já foi iniciada ou concluída.',
       );
+    }
+
+    const { data: subscription } = await this.supabaseService.getClient()
+      .from('subscriptions')
+      .select('limite_contatos_campanhas, contatos_usados_campanhas')
+      .eq('profile_id', userId)
+      .single();
+
+    if (subscription) {
+      if ((subscription.contatos_usados_campanhas || 0) >= (subscription.limite_contatos_campanhas || 100)) {
+        throw new BadRequestException('Seu limite de contatos em campanhas foi atingido. O administrador da conta precisa realizar um upgrade de plano para iniciar campanhas.');
+      }
     }
 
     const connection = this.unwrapRelation<{

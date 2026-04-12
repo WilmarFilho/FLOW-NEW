@@ -269,13 +269,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(18, 105, 244, 0.3);
 }
 
-.saveBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(18, 105, 244, 0.4);
-}
 
 .saveBtn:disabled {
   opacity: 0.7;

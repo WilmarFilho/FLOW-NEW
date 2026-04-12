@@ -57,6 +57,23 @@ export class AdminGuard implements CanActivate {
       );
     }
 
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('limite_mensagens_mensais, mensagens_enviadas, contatos_usados_campanhas, limite_contatos_campanhas')
+        .eq('profile_id', userId)
+        .single();
+        
+      if (subscription) {
+        if (
+          (subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500) ||
+          (subscription.contatos_usados_campanhas || 0) >= (subscription.limite_contatos_campanhas || 100)
+        ) {
+          throw new HttpException('Acesso restrito: Limites do plano foram esgotados. Realize o upgrade.', HttpStatus.FORBIDDEN);
+        }
+      }
+    }
+
     request.userId = userId;
     return true;
   }

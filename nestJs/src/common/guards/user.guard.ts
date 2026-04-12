@@ -42,12 +42,41 @@ export class UserGuard implements CanActivate {
     const supabase = this.supabaseService.getClient();
     const { data: profile, error } = await supabase
       .from('profile')
-      .select('auth_id')
+      .select('auth_id, tipo_de_usuario')
       .eq('auth_id', userId)
       .single();
 
     if (error || !profile) {
       throw new HttpException('Perfil não encontrado', HttpStatus.UNAUTHORIZED);
+    }
+
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+      let adminProfileId = userId;
+      if (profile.tipo_de_usuario === 'atendente') {
+        const { data: atendente } = await supabase
+          .from('atendentes')
+          .select('admin_id')
+          .eq('profile_id', userId)
+          .single();
+        if (atendente?.admin_id) {
+          adminProfileId = atendente.admin_id;
+        }
+      }
+
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('limite_mensagens_mensais, mensagens_enviadas, contatos_usados_campanhas, limite_contatos_campanhas')
+        .eq('profile_id', adminProfileId)
+        .single();
+        
+      if (subscription) {
+        if (
+          (subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500) ||
+          (subscription.contatos_usados_campanhas || 0) >= (subscription.limite_contatos_campanhas || 100)
+        ) {
+          throw new HttpException('Acesso restrito: Limites do plano foram esgotados. O administrador da conta precisa realizar o upgrade.', HttpStatus.FORBIDDEN);
+        }
+      }
     }
 
     request.userId = userId;

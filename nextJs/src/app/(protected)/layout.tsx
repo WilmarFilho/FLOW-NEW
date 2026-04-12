@@ -93,18 +93,20 @@ export default async function ProtectedLayout({
       
       {paywallReason ? (
         <PaywallModal reason={paywallReason} profileId={assinanteProfileId} />
-      ) : null}
-
-      <Sidebar user={{
-        nome_completo: profile?.nome_completo || user.email?.split('@')[0],
-        email: user.email,
-        foto_perfil: profile?.foto_perfil,
-        plano: planoAtivo,
-        tipo_de_usuario: tipoUsuario
-      }} />
-      <main className={styles.mainContent}>
-        {children}
-      </main>
+      ) : (
+        <>
+          <Sidebar user={{
+            nome_completo: profile?.nome_completo || user.email?.split('@')[0],
+            email: user.email,
+            foto_perfil: profile?.foto_perfil,
+            plano: planoAtivo,
+            tipo_de_usuario: tipoUsuario
+          }} />
+          <main className={styles.mainContent}>
+            {children}
+          </main>
+        </>
+      )}
     </div>
   );
 }
