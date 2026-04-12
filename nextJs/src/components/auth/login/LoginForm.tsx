@@ -35,7 +35,7 @@ export default function LoginForm({ onSwitchView, onForgot }: LoginFormProps) {
       setErrorMessage(error.message);
     } else {
       // redirect or set user globally
-      window.location.href = '/dashboard';
+      window.location.href = '/home';
     }
 
     setLoading(false);
