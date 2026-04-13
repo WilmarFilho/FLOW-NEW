@@ -16,6 +16,11 @@ import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
+  @Post('password-reset-eligibility')
+  async canRequestPasswordReset(@Body('email') email: string) {
+    return this.profileService.canRequestPasswordReset(email);
+  }
+
   @Patch()
   @UseGuards(UserGuard)
   async updateProfile(

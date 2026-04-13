@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { apiRequest } from '@/lib/api/client';
 import styles from '../AuthForm.module.css';
 
 interface ForgotPasswordFormProps {
@@ -26,7 +27,33 @@ export default function ForgotPasswordForm({ onSwitchView }: ForgotPasswordFormP
 
     setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    try {
+      const result = await apiRequest<{ allowed: boolean }>(
+        '/profile/password-reset-eligibility',
+        {
+          method: 'POST',
+          body: { email: email.trim() },
+        },
+      );
+
+      if (!result.allowed) {
+        setErrorMessage(
+          'Apenas o administrador pode alterar ou recuperar a senha de um atendente.',
+        );
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível validar o tipo de usuário.',
+      );
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/callback?next=/login?mode=reset-password`,
     });
 

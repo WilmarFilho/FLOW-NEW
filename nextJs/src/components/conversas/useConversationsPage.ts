@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -156,6 +156,7 @@ export function useConversationsPage() {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
+  const [isUpdatingAssignment, setIsUpdatingAssignment] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
@@ -166,6 +167,7 @@ export function useConversationsPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState(false);
   const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+  const nextMessagesOffsetRef = useRef<number | null>(0);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -194,6 +196,11 @@ export function useConversationsPage() {
     ([, uid]) => apiRequest<ConversationOptions>('/conversas/options', { userId: uid }),
     REFRESH_OPTIONS,
   );
+
+  const assignedUsersRef = useRef<ConversationAssignedOption[]>([]);
+  useEffect(() => {
+    assignedUsersRef.current = options?.assignedUsers ?? [];
+  }, [options?.assignedUsers]);
 
   const {
     data: selectedConversation,
@@ -302,9 +309,9 @@ export function useConversationsPage() {
         return;
       }
 
-      const offset = mode === 'appendOlder' ? nextMessagesOffset ?? 0 : 0;
+      const offset = mode === 'appendOlder' ? nextMessagesOffsetRef.current ?? 0 : 0;
 
-      if (mode === 'appendOlder' && nextMessagesOffset === null) {
+      if (mode === 'appendOlder' && nextMessagesOffsetRef.current === null) {
         return;
       }
 
@@ -336,6 +343,7 @@ export function useConversationsPage() {
         });
         setHasMoreMessages(response.hasMore);
         setNextMessagesOffset(response.nextOffset);
+        nextMessagesOffsetRef.current = response.nextOffset;
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -347,7 +355,7 @@ export function useConversationsPage() {
         setIsLoadingMoreMessages(false);
       }
     },
-    [nextMessagesOffset, selectedConversationId, userId],
+    [selectedConversationId, userId],
   );
 
   useEffect(() => {
@@ -363,9 +371,12 @@ export function useConversationsPage() {
       setMessages([]);
       setHasMoreMessages(false);
       setNextMessagesOffset(0);
+      nextMessagesOffsetRef.current = 0;
       return;
     }
 
+    setNextMessagesOffset(0);
+    nextMessagesOffsetRef.current = 0;
     void loadMessages('replace');
   }, [loadMessages, selectedConversationId]);
 
@@ -409,9 +420,11 @@ export function useConversationsPage() {
         return;
       }
 
+      const recordId = record.id;
+
       if (payload.eventType === 'DELETE') {
-        setConversations((current) => current.filter((item) => item.id !== record.id));
-        if (selectedConversationId === record.id) {
+        setConversations((current) => current.filter((item) => item.id !== recordId));
+        if (selectedConversationId === recordId) {
           setSelectedConversationId(null);
           setMessages([]);
         }
@@ -419,7 +432,7 @@ export function useConversationsPage() {
       }
 
       if (payload.eventType === 'INSERT') {
-        void apiRequest<ConversationSummary>(`/conversas/${record.id}`, { userId })
+        void apiRequest<ConversationSummary>(`/conversas/${recordId}`, { userId })
           .then((newConv) => {
             setConversations((current) => {
               if (current.some(c => c.id === newConv.id)) return current;
@@ -432,10 +445,40 @@ export function useConversationsPage() {
         return;
       }
 
-      patchConversationInState(record.id, (current) => ({
-        ...current,
-        ...record,
-      }));
+      patchConversationInState(recordId, (current) => {
+        let profile = current.profile;
+
+        if (record.assigned_user_id !== undefined && record.assigned_user_id !== current.assigned_user_id) {
+          if (record.assigned_user_id === null) {
+            profile = null;
+          } else {
+            const matchedUser = assignedUsersRef.current.find(
+              (u) => u.auth_id === record.assigned_user_id
+            );
+            if (matchedUser) {
+              profile = {
+                auth_id: matchedUser.auth_id,
+                nome_completo: matchedUser.nome_completo,
+                foto_perfil: null,
+              };
+            } else {
+              setTimeout(() => {
+                void apiRequest<ConversationSummary>(`/conversas/${recordId}`, { userId })
+                  .then((newConv) => {
+                    patchConversationInState(recordId, () => newConv);
+                  })
+                  .catch(() => undefined);
+              }, 0);
+            }
+          }
+        }
+
+        return {
+          ...current,
+          ...record,
+          profile,
+        };
+      });
     };
 
     const handleMessageChange = (
@@ -721,6 +764,42 @@ export function useConversationsPage() {
     }
   };
 
+  const updateConversationAssignment = async (assignedUserId: string) => {
+    if (!userId || !selectedConversationId) {
+      return;
+    }
+
+    setIsUpdatingAssignment(true);
+
+    try {
+      const updated = await apiRequest<ConversationSummary>(
+        `/conversas/${selectedConversationId}/assignment`,
+        {
+          method: 'PATCH',
+          userId,
+          body: { assigned_user_id: assignedUserId || null },
+        },
+      );
+
+      patchConversationInState(selectedConversationId, () => updated);
+      await mutateSelectedConversation(updated, false);
+      toast.success(
+        updated.assigned_user_id
+          ? 'Responsável atualizado.'
+          : 'Conversa liberada para outro responsável.',
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível atualizar o responsável da conversa.',
+      );
+      throw error;
+    } finally {
+      setIsUpdatingAssignment(false);
+    }
+  };
+
   const selectConversation = (conversationId: string) => {
     setSelectedConversationId(conversationId);
     setMobilePane('chat');
@@ -747,10 +826,12 @@ export function useConversationsPage() {
     isLoadingOptions,
     isSendingMessage,
     isTogglingAi,
+    isUpdatingAssignment,
     loadMoreConversations: () => loadConversations('append'),
     loadOlderMessages: () => loadMessages('appendOlder'),
     mobilePane,
     options,
+    canManageAssignments: options?.canManageAssignments ?? false,
     search,
     renameConversationContact,
     selectedAssignedUserId,
@@ -759,6 +840,7 @@ export function useConversationsPage() {
     selectedConversationId,
     selectConversation,
     sendMessage,
+    updateConversationAssignment,
     uploadMessageFile,
     deleteConversationMessage,
     setFilter,

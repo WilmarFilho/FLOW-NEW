@@ -76,6 +76,7 @@ export interface ConversationMessage {
 }
 
 export interface ConversationOptions {
+  canManageAssignments: boolean;
   connections: ConversationConnection[];
   contacts: ConversationContact[];
   assignedUsers: ConversationAssignedOption[];

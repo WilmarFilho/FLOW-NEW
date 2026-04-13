@@ -13,3 +13,7 @@ export class SendConversaMessageDto {
 export class ToggleConversaAiDto {
   enabled!: boolean;
 }
+
+export class UpdateConversaAssignmentDto {
+  assigned_user_id!: string | null;
+}

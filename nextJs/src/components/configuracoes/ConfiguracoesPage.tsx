@@ -247,7 +247,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
           onClick={() => handleTabChange('perfil')}
         >
           <User size={18} />
-          Meu Perfil
+          Perfil
           {activeTab === 'perfil' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
         </button>
         <button
@@ -258,22 +258,26 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
           Sistema
           {activeTab === 'sistema' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
         </button>
-        <button
-          className={`${styles.tabButton} ${activeTab === 'integracoes' ? styles.active : ''}`}
-          onClick={() => handleTabChange('integracoes')}
-        >
-          <Plug size={18} />
-          Integrações
-          {activeTab === 'integracoes' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
-        </button>
-        <button
-          className={`${styles.tabButton} ${activeTab === 'assinatura' ? styles.active : ''}`}
-          onClick={() => handleTabChange('assinatura')}
-        >
-          <CreditCard size={18} />
-          Assinatura
-          {activeTab === 'assinatura' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
-        </button>
+        {initialData.tipo_de_usuario !== 'atendente' && (
+          <>
+            <button
+              className={`${styles.tabButton} ${activeTab === 'integracoes' ? styles.active : ''}`}
+              onClick={() => handleTabChange('integracoes')}
+            >
+              <Plug size={18} />
+              Integrações
+              {activeTab === 'integracoes' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
+            </button>
+            <button
+              className={`${styles.tabButton} ${activeTab === 'assinatura' ? styles.active : ''}`}
+              onClick={() => handleTabChange('assinatura')}
+            >
+              <CreditCard size={18} />
+              Assinatura
+              {activeTab === 'assinatura' && <motion.div layoutId="tabIndicator_config" className={styles.tabIndicator} />}
+            </button>
+          </>
+        )}
       </div>
 
       <div className={styles.contentArea}>
@@ -373,10 +377,12 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                     <label>Nova Senha</label>
                     <input
                       type="password"
-                      className={styles.input}
+                      className={`${styles.input} ${initialData.tipo_de_usuario === 'atendente' ? styles.readOnly : ''}`}
                       value={senha}
                       onChange={(e) => setSenha(e.target.value)}
-                      placeholder="Deixe em branco para manter a atual"
+                      placeholder={initialData.tipo_de_usuario === 'atendente' ? "Ocultado por segurança" : "Deixe em branco para manter a atual"}
+                      disabled={initialData.tipo_de_usuario === 'atendente'}
+                      title={initialData.tipo_de_usuario === 'atendente' ? 'Apenas admins podem realizar a troca de senha do seu acesso.' : ''}
                     />
                   </div>
 
@@ -395,10 +401,12 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
                     <label>Número</label>
                     <input
                       type="text"
-                      className={styles.input}
+                      className={`${styles.input} ${initialData.tipo_de_usuario === 'atendente' ? styles.readOnly : ''}`}
                       value={numero}
                       onChange={(e) => setNumero(e.target.value)}
                       placeholder="Ex: 50"
+                      disabled={initialData.tipo_de_usuario === 'atendente'}
+                      title={initialData.tipo_de_usuario === 'atendente' ? 'Apenas o administrador pode alterar o seu número no sistema.' : ''}
                     />
                   </div>
 
@@ -459,12 +467,15 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
                 <div className={styles.settingItem}>
                   <div className={styles.settingInfo}>
-                    <h4>Agendamento automático pela IA</h4>
+                    <h4>Agendamento automático pela IA {initialData.tipo_de_usuario === 'atendente' && <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', marginLeft: '8px' }}>Admin</span>}</h4>
                     <p>Permite que a IA ofereça horários livres e confirme agendamentos automaticamente nas conversas.</p>
                   </div>
                   <div
                     className={`${styles.toggleSwitch} ${agendamentoAutomaticoIa ? styles.active : ''}`}
-                    onClick={() => setAgendamentoAutomaticoIa(!agendamentoAutomaticoIa)}
+                    style={{ opacity: initialData.tipo_de_usuario === 'atendente' ? 0.5 : 1, cursor: initialData.tipo_de_usuario === 'atendente' ? 'not-allowed' : 'pointer' }}
+                    onClick={() => {
+                      if (initialData.tipo_de_usuario !== 'atendente') setAgendamentoAutomaticoIa(!agendamentoAutomaticoIa);
+                    }}
                   >
                     <div className={styles.toggleKnob} />
                   </div>
@@ -472,12 +483,15 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
 
                 <div className={styles.settingItem}>
                   <div className={styles.settingInfo}>
-                    <h4>Alertar atendentes quando a IA pedir ajuda</h4>
+                    <h4>Alertar atendentes quando a IA pedir ajuda {initialData.tipo_de_usuario === 'atendente' && <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', marginLeft: '8px' }}>Admin</span>}</h4>
                     <p>Envia notificações para os números dos atendentes vinculados à conexão quando houver necessidade de intervenção humana.</p>
                   </div>
                   <div
                     className={`${styles.toggleSwitch} ${alertaAtendentesIntervencaoIa ? styles.active : ''}`}
-                    onClick={() => setAlertaAtendentesIntervencaoIa(!alertaAtendentesIntervencaoIa)}
+                    style={{ opacity: initialData.tipo_de_usuario === 'atendente' ? 0.5 : 1, cursor: initialData.tipo_de_usuario === 'atendente' ? 'not-allowed' : 'pointer' }}
+                    onClick={() => {
+                      if (initialData.tipo_de_usuario !== 'atendente') setAlertaAtendentesIntervencaoIa(!alertaAtendentesIntervencaoIa);
+                    }}
                   >
                     <div className={styles.toggleKnob} />
                   </div>

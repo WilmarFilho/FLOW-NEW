@@ -18,6 +18,7 @@ import {
   CreateConversaDto,
   SendConversaMessageDto,
   ToggleConversaAiDto,
+  UpdateConversaAssignmentDto,
 } from './dto/create-conversa.dto';
 import {
   ListConversasParams,
@@ -104,6 +105,19 @@ export class ConversasController {
     @Body() dto: ToggleConversaAiDto,
   ) {
     return this.conversasService.toggleAi(userId, conversaId, dto.enabled);
+  }
+
+  @Patch(':id/assignment')
+  async updateAssignment(
+    @CurrentUserId() userId: string,
+    @Param('id') conversaId: string,
+    @Body() dto: UpdateConversaAssignmentDto,
+  ) {
+    return this.conversasService.updateAssignment(
+      userId,
+      conversaId,
+      dto.assigned_user_id,
+    );
   }
 
   @Post(':id/messages')

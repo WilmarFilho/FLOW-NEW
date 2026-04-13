@@ -568,8 +568,9 @@ export class CampanhasService {
               pendentes,
             });
 
-            // Increment usage
+            // Increment usage — contatos de campanha e mensagens trafegadas
             await client.rpc('increment_contatos_campanhas', { p_profile_id: userId });
+            await client.rpc('increment_mensagens_enviadas', { p_profile_id: userId });
           } else {
             falhas += 1;
             pendentes -= 1;

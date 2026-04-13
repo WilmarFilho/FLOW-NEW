@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react';
 import Image from 'next/image';
+import { createPortal } from 'react-dom';
 import {
   cardEntrance,
   listStagger,
@@ -54,6 +55,12 @@ const FILTER_LABELS: Record<ConversationFilter, string> = {
 };
 
 type FilterModalKind = 'assigned' | 'connection' | null;
+
+type AssignmentOption = {
+  description: string;
+  id: string;
+  label: string;
+};
 
 function unwrapRelation<T>(value: T | T[] | null | undefined) {
   if (Array.isArray(value)) {
@@ -357,6 +364,149 @@ function FilterSelectionModal({
   );
 }
 
+function ConversationSettingsModal({
+  assignmentOptions,
+  currentAssignedUserId,
+  currentOwnerLabel,
+  isOpen,
+  isSaving,
+  onApplyAssignment,
+  onClose,
+}: {
+  assignmentOptions: AssignmentOption[];
+  currentAssignedUserId: string | null;
+  currentOwnerLabel: string;
+  isOpen: boolean;
+  isSaving: boolean;
+  onApplyAssignment: (nextAssignedUserId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [draftAssignment, setDraftAssignment] = useState(currentAssignedUserId || '');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setDraftAssignment(currentAssignedUserId || '');
+  }, [currentAssignedUserId, isOpen]);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          className={styles.modalBackdrop}
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          <motion.div
+            className={styles.assignmentModalShell}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Editar conversa"
+            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <span className={styles.modalEyebrow}>Conversa</span>
+                <h2 className={styles.modalTitle}>Editar atendimento</h2>
+                <p className={styles.modalDescription}>
+                  Ajuste quem fica responsável por esta conversa ou deixe livre para outro assumir.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={onClose}
+                aria-label="Fechar modal"
+                disabled={isSaving}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className={styles.assignmentModalBody}>
+              <div className={styles.assignmentCurrentCard}>
+                <span className={styles.assignmentCurrentLabel}>Responsável atual</span>
+                <strong>{currentOwnerLabel}</strong>
+              </div>
+
+              <section className={styles.modalSection}>
+                <div className={styles.sectionHeader}>
+                  <h3>Responsável da conversa</h3>
+                  <span>{assignmentOptions.length} opção(ões)</span>
+                </div>
+
+                <div className={styles.assignmentOptionList}>
+                  {assignmentOptions.map((option) => {
+                    const isActive = draftAssignment === option.id;
+
+                    return (
+                      <button
+                        key={option.id || 'none'}
+                        type="button"
+                        className={`${styles.assignmentOptionCard} ${
+                          isActive ? styles.assignmentOptionCardActive : ''
+                        }`}
+                        onClick={() => setDraftAssignment(option.id)}
+                        disabled={isSaving}
+                      >
+                        <div className={styles.assignmentOptionCopy}>
+                          <strong>{option.label}</strong>
+                          <span>{option.description}</span>
+                        </div>
+                        <span className={styles.assignmentOptionIndicator}>
+                          {isActive ? 'Selecionado' : 'Selecionar'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button
+                type="button"
+                className={styles.ghostButton}
+                onClick={onClose}
+                disabled={isSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => void onApplyAssignment(draftAssignment)}
+                disabled={isSaving || draftAssignment === (currentAssignedUserId || '')}
+              >
+                {isSaving ? 'Salvando...' : 'Salvar responsável'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
 function canManuallyReply(conversation?: ConversationSummary) {
   if (!conversation || conversation.ai_enabled || !conversation.ai_disabled_at) {
     return false;
@@ -596,6 +746,7 @@ function MessageGroup({
 export default function ConversationsPage() {
   const {
     assignedUsers,
+    canManageAssignments,
     conversations,
     createConversation,
     deleteConversationMessage,
@@ -614,6 +765,7 @@ export default function ConversationsPage() {
     isLoadingOptions,
     isSendingMessage,
     isTogglingAi,
+    isUpdatingAssignment,
     loadMoreConversations,
     loadOlderMessages,
     mobilePane,
@@ -632,6 +784,7 @@ export default function ConversationsPage() {
     setSelectedAssignedUserId,
     setSelectedConnectionId,
     toggleAi,
+    updateConversationAssignment,
     uploadMessageFile,
   } = useConversationsPage();
   const [draftMessage, setDraftMessage] = useState('');
@@ -643,6 +796,7 @@ export default function ConversationsPage() {
   const [isMobileComposerMenuOpen, setIsMobileComposerMenuOpen] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [isRenamingContact, setIsRenamingContact] = useState(false);
+  const [isConversationSettingsOpen, setIsConversationSettingsOpen] = useState(false);
   const [composerActivity, setComposerActivity] = useState<{
     kind: 'audio' | 'image' | 'text';
     label: string;
@@ -685,6 +839,31 @@ export default function ConversationsPage() {
   const selectedAssignedLabel =
     assignedUsers.find((item) => item.auth_id === selectedAssignedUserId)?.nome_completo ||
     'Todos os responsaveis';
+
+  const assignmentOptions = useMemo<AssignmentOption[]>(() => {
+    if (canManageAssignments) {
+      return [
+        {
+          id: '',
+          label: 'Ninguém',
+          description: 'Deixa a conversa sem responsável para outro atendente assumir.',
+        },
+        ...assignedUsers.map((item) => ({
+          id: item.auth_id,
+          label: item.nome_completo || 'Usuário',
+          description: 'Atribui a conversa diretamente para este responsável.',
+        })),
+      ];
+    }
+
+    return [
+      {
+        id: '',
+        label: 'Liberar conversa',
+        description: 'Remove você desta conversa para outro atendente assumir depois.',
+      },
+    ];
+  }, [assignedUsers, canManageAssignments]);
 
   const scrollToLatestMessage = (behavior: ScrollBehavior = 'auto') => {
     const endNode = messagesEndRef.current;
@@ -761,7 +940,14 @@ export default function ConversationsPage() {
   }, [selectedConversationId]);
 
   useLayoutEffect(() => {
-    if (!messagesRef.current || preserveScrollRef.current || !initialScrollPendingRef.current || isLoadingMessages) {
+    if (
+      !selectedConversationId ||
+      !messagesRef.current ||
+      preserveScrollRef.current ||
+      !initialScrollPendingRef.current ||
+      isLoadingConversation ||
+      isLoadingMessages
+    ) {
       return;
     }
 
@@ -771,7 +957,7 @@ export default function ConversationsPage() {
         initialScrollPendingRef.current = false;
       });
     });
-  }, [groupedMessages.length, isLoadingMessages]);
+  }, [groupedMessages.length, isLoadingConversation, isLoadingMessages, selectedConversationId]);
 
   useEffect(() => {
     if (!messagesRef.current || !preserveScrollRef.current) {
@@ -838,6 +1024,11 @@ export default function ConversationsPage() {
     } finally {
       setIsRenamingContact(false);
     }
+  };
+
+  const handleUpdateAssignment = async (nextAssignedUserId: string) => {
+    await updateConversationAssignment(nextAssignedUserId);
+    setIsConversationSettingsOpen(false);
   };
 
   const handleSendTextMessage = () => {
@@ -1189,6 +1380,15 @@ export default function ConversationsPage() {
                     ) : null}
                     <button
                       type="button"
+                      className={styles.editNameButton}
+                      onClick={() => setIsConversationSettingsOpen(true)}
+                      aria-label="Editar conversa"
+                      title="Editar conversa"
+                    >
+                      <MoreVertical size={15} />
+                    </button>
+                    <button
+                      type="button"
                       className={`${styles.toggleButton} ${selectedConversation.ai_enabled ? styles.toggleButtonActive : ''
                         }`}
                       onClick={() => void toggleAi(!selectedConversation.ai_enabled)}
@@ -1201,7 +1401,6 @@ export default function ConversationsPage() {
                 </div>
 
                 <div className={styles.chatInfoBar}>
-
                   <div className={styles.infoPill}>
                     <CheckCheck size={14} />
                     <span>
@@ -1472,6 +1671,22 @@ export default function ConversationsPage() {
           }
         }}
         onConfirm={handleRenameContact}
+      />
+
+      <ConversationSettingsModal
+        assignmentOptions={assignmentOptions}
+        currentAssignedUserId={selectedConversation?.assigned_user_id || null}
+        currentOwnerLabel={
+          assignedUser?.nome_completo || 'Ninguém responsável no momento'
+        }
+        isOpen={isConversationSettingsOpen && Boolean(selectedConversation)}
+        isSaving={isUpdatingAssignment}
+        onApplyAssignment={handleUpdateAssignment}
+        onClose={() => {
+          if (!isUpdatingAssignment) {
+            setIsConversationSettingsOpen(false);
+          }
+        }}
       />
 
       {isLoadingOptions ? <span className={styles.hiddenAssistive}>Carregando opções</span> : null}

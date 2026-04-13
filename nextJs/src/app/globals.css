@@ -113,9 +113,13 @@ body {
 
 /* Oculta scrollbar completamente (cross-browser) */
 .scrollbar-none {
-  scrollbar-width: none;        /* Firefox */
-  -ms-overflow-style: none;     /* IE / Edge legado */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE / Edge legado */
 }
+
 .scrollbar-none::-webkit-scrollbar {
-  display: none;                /* Chrome / Safari / Edge */
+  display: none;
+  /* Chrome / Safari / Edge */
 }

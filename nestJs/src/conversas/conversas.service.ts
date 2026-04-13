@@ -236,6 +236,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     return {
       assignedUsers,
+      canManageAssignments: !access.isAtendente,
       connections: connections ?? [],
       contacts: contacts ?? [],
     };
@@ -282,12 +283,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const contatoId = dto.contato_id
       ? await this.assertContatoAccess(access, dto.contato_id)
       : (
-          await this.findOrCreateContact(
-            access.effectiveAdminId,
-            dto.contact_whatsapp || '',
-            dto.contact_name?.trim() || null,
-          )
-        ).id;
+        await this.findOrCreateContact(
+          access.effectiveAdminId,
+          dto.contact_whatsapp || '',
+          dto.contact_name?.trim() || null,
+        )
+      ).id;
 
     const client = this.supabaseService.getClient();
 
@@ -418,6 +419,85 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     return this.refreshConversationContactAvatar(data);
   }
 
+  async updateAssignment(
+    userId: string,
+    conversaId: string,
+    assignedUserId: string | null,
+  ) {
+    const access = await this.getAccessContext(userId);
+    const conversa = await this.getAccessibleConversa(userId, conversaId);
+    const normalizedAssignedUserId = assignedUserId?.trim() || null;
+
+    if (access.isAtendente) {
+      if (normalizedAssignedUserId) {
+        throw new ForbiddenException(
+          'Atendentes só podem liberar a conversa para ninguém.',
+        );
+      }
+
+      if (
+        conversa.assigned_user_id &&
+        String(conversa.assigned_user_id) !== String(userId)
+      ) {
+        throw new ForbiddenException(
+          'Você só pode liberar conversas atribuídas a você.',
+        );
+      }
+    }
+
+    if (normalizedAssignedUserId) {
+      const allowedUsers = await this.listConversationAssignedUsers(
+        access.effectiveAdminId,
+      );
+      const isAllowedUser = allowedUsers.some(
+        (option) => option.auth_id === normalizedAssignedUserId,
+      );
+
+      if (!isAllowedUser) {
+        throw new BadRequestException(
+          'O responsável informado não pode assumir esta conversa.',
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const payload = normalizedAssignedUserId
+      ? {
+          assigned_at: now,
+          assigned_user_id: normalizedAssignedUserId,
+          human_intervention_reason: null,
+          human_intervention_requested_at: null,
+          last_attendant_alert_at: null,
+          updated_at: now,
+        }
+      : {
+          assigned_at: null,
+          assigned_user_id: null,
+          updated_at: now,
+        };
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('conversas')
+      .update(payload)
+      .eq('id', conversaId)
+      .select(
+        `
+        *,
+        contatos ( id, nome, whatsapp, avatar_url ),
+          whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
+        profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
+      `,
+      )
+      .single();
+
+    if (error || !data) {
+      throw error;
+    }
+
+    return this.refreshConversationContactAvatar(data);
+  }
+
   async sendMensagem(
     userId: string,
     conversaId: string,
@@ -460,18 +540,18 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const result = manualContext.replyPayload
       ? await this.evolutionApiService.sendTextMessageWithOptions(
-          manualContext.connection.instance_name,
-          {
-            number: manualContext.normalizedNumber,
-            quoted: manualContext.replyPayload,
-            text: outboundContent,
-          },
-        )
+        manualContext.connection.instance_name,
+        {
+          number: manualContext.normalizedNumber,
+          quoted: manualContext.replyPayload,
+          text: outboundContent,
+        },
+      )
       : await this.evolutionApiService.sendTextMessage(
-          manualContext.connection.instance_name,
-          manualContext.normalizedNumber,
-          outboundContent,
-        );
+        manualContext.connection.instance_name,
+        manualContext.normalizedNumber,
+        outboundContent,
+      );
 
     if (!result) {
       throw new BadRequestException('Falha ao enviar a mensagem pelo WhatsApp.');
@@ -527,25 +607,25 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const result = mimeType.startsWith('audio/')
       ? await this.evolutionApiService.sendWhatsAppAudio(
-          manualContext.connection.instance_name,
-          {
-            audio: base64,
-            number: manualContext.normalizedNumber,
-            quoted: manualContext.replyPayload || undefined,
-          },
-        )
+        manualContext.connection.instance_name,
+        {
+          audio: base64,
+          number: manualContext.normalizedNumber,
+          quoted: manualContext.replyPayload || undefined,
+        },
+      )
       : await this.evolutionApiService.sendMediaMessage(
-          manualContext.connection.instance_name,
-          {
-            caption: caption?.trim() || undefined,
-            fileName: file.originalname || `arquivo-${Date.now()}`,
-            media: base64,
-            mediatype: this.getOutboundMediaTypeFromMime(mimeType),
-            mimetype: mimeType,
-            number: manualContext.normalizedNumber,
-            quoted: manualContext.replyPayload || undefined,
-          },
-        );
+        manualContext.connection.instance_name,
+        {
+          caption: caption?.trim() || undefined,
+          fileName: file.originalname || `arquivo-${Date.now()}`,
+          media: base64,
+          mediatype: this.getOutboundMediaTypeFromMime(mimeType),
+          mimetype: mimeType,
+          number: manualContext.normalizedNumber,
+          quoted: manualContext.replyPayload || undefined,
+        },
+      );
 
     if (!result) {
       throw new BadRequestException('Falha ao enviar o arquivo pelo WhatsApp.');
@@ -861,11 +941,15 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const instanceName = payload?.instance;
     if (!instanceName) {
+      console.warn('[WEBHOOK] Payload sem instance name.');
       return { processed: false };
     }
 
+    console.log(`[WEBHOOK] Evento messages.upsert recebido. instancia=${instanceName}`);
+
     const connection = await this.findConnectionByInstance(instanceName);
     if (!connection) {
+      console.warn(`[WEBHOOK] Conexão não encontrada para instancia=${instanceName}`);
       return { processed: false };
     }
 
@@ -878,13 +962,17 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (this.isOwnWhatsappMessage(messageData)) {
+      console.log(`[WEBHOOK] Mensagem fromMe detectada. instancia=${instanceName}`);
       return this.handleOwnWhatsappMessage(connection, payload, messageData);
     }
 
     const incomingMessage = await this.extractIncomingMessage(connection, payload);
     if (!incomingMessage) {
+      console.warn(`[WEBHOOK] Não foi possível extrair mensagem do payload. instancia=${instanceName}`);
       return { processed: false };
     }
+
+    console.log(`[WEBHOOK] Mensagem inbound. telefone=${incomingMessage.phone} tipo=${incomingMessage.messageType}`);
 
     const contact = await this.findOrCreateContact(
       connection.user_id,
@@ -904,6 +992,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     await this.persistIncomingMessage(conversa, connection.id, incomingMessage);
 
+    console.log(`[WEBHOOK] Mensagem persistida e lote enfileirado. conversa=${conversa.id}`);
+
     return { processed: true, conversaId: conversa.id };
   }
 
@@ -922,13 +1012,13 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
     const mediaUpload = message.mediaBuffer
       ? await this.uploadMedia(
-          conversa.profile_id,
-          conversa.id,
-          this.extractOutgoingMessageId(message.rawPayload),
-          message.messageType,
-          message.mediaMimeType,
-          message.mediaBuffer,
-        )
+        conversa.profile_id,
+        conversa.id,
+        this.extractOutgoingMessageId(message.rawPayload),
+        message.messageType,
+        message.mediaMimeType,
+        message.mediaBuffer,
+      )
       : null;
 
     const preview = message.content || this.getFallbackPreview(message.messageType);
@@ -981,6 +1071,13 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         updated_at: now,
       })
       .eq('id', conversa.id);
+
+    // Contabiliza todas as mensagens trafegadas (inbound do contato)
+    await this.supabaseService
+      .getClient()
+      .rpc('increment_mensagens_enviadas', { p_profile_id: conversa.profile_id });
+
+    console.log('Mensagem recebida:', message);
 
     if (latestMessage?.id) {
       await this.queueInboundBatch(conversa.id, conversa.profile_id, latestMessage.id);
@@ -1160,7 +1257,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
           whatsapp_connections ( id, nome, numero, status, instance_name, cor, deleted_at ),
         profile:assigned_user_id ( auth_id, nome_completo, foto_perfil )
       `,
-        )
+      )
       .eq('id', conversaId)
       .eq('profile_id', access.effectiveAdminId)
       .is('deleted_at', null);
@@ -1183,12 +1280,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const { data } = await this.supabaseService
       .getClient()
-        .from('contatos')
-        .select('id')
-        .eq('id', contatoId)
-        .eq('profile_id', access.effectiveAdminId)
-        .is('deleted_at', null)
-        .maybeSingle();
+      .from('contatos')
+      .select('id')
+      .eq('id', contatoId)
+      .eq('profile_id', access.effectiveAdminId)
+      .is('deleted_at', null)
+      .maybeSingle();
 
     if (!data) {
       throw new NotFoundException('Contato não encontrado.');
@@ -1203,11 +1300,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   ) {
     const query = this.supabaseService
       .getClient()
-        .from('whatsapp_connections')
-        .select('id')
-        .eq('id', whatsappConnectionId)
-        .eq('user_id', access.effectiveAdminId)
-        .is('deleted_at', null);
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('id', whatsappConnectionId)
+      .eq('user_id', access.effectiveAdminId)
+      .is('deleted_at', null);
 
     this.applyConnectionScope(query, access.allowedConnectionIds, 'id');
     const { data } = await query.maybeSingle();
@@ -1322,12 +1419,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const { data } = await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
-        .select(
-          'id, user_id, instance_name, nome, numero, agente_id, conhecimento_id, status',
-        )
-        .eq('instance_name', instanceName)
-        .is('deleted_at', null)
-        .maybeSingle();
+      .select(
+        'id, user_id, instance_name, nome, numero, agente_id, conhecimento_id, status',
+      )
+      .eq('instance_name', instanceName)
+      .is('deleted_at', null)
+      .maybeSingle();
 
     return data;
   }
@@ -1359,6 +1456,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         updated_at: now,
       })
       .eq('id', conversation.id);
+
+    // Contabiliza todas as mensagens trafegadas (fromMe via webhook, enviadas fora da plataforma)
+    await this.supabaseService
+      .getClient()
+      .rpc('increment_mensagens_enviadas', { p_profile_id: connection.user_id });
 
     this.logger.debug(
       `IA desativada automaticamente por mensagem enviada fora da plataforma. conversa=${conversation.id} telefone=${phone}`,
@@ -1581,10 +1683,10 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
     const nextAvatarUrl = options?.instanceName
       ? await this.resolveContactAvatarUrl(
-          options.instanceName,
-          normalizedPhone,
-          options.remoteJid || null,
-        )
+        options.instanceName,
+        normalizedPhone,
+        options.remoteJid || null,
+      )
       : null;
 
     const client = this.supabaseService.getClient();
@@ -1669,14 +1771,14 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     contatoId: string,
   ) {
     const client = this.supabaseService.getClient();
-      const { data: existing } = await client
-        .from('conversas')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('whatsapp_connection_id', connectionId)
-        .eq('contato_id', contatoId)
-        .is('deleted_at', null)
-        .maybeSingle();
+    const { data: existing } = await client
+      .from('conversas')
+      .select('*')
+      .eq('profile_id', profileId)
+      .eq('whatsapp_connection_id', connectionId)
+      .eq('contato_id', contatoId)
+      .is('deleted_at', null)
+      .maybeSingle();
 
     if (existing) {
       await this.touchContactConnectionPresence(profileId, contatoId, connectionId);
@@ -1773,19 +1875,28 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         .order('scheduled_for', { ascending: true })
         .limit(5);
 
-      if (error || !dueBatches?.length) {
+      if (error) {
+        console.error('[BATCH-POLL] Erro ao buscar lotes pendentes:', error);
         return;
       }
+
+      if (!dueBatches?.length) {
+        return;
+      }
+
+      console.log(`[BATCH-POLL] ${dueBatches.length} lote(s) pendente(s) encontrado(s).`);
 
       for (const batch of dueBatches as ConversationBatch[]) {
         const claimed = await this.claimBatch(batch.id);
         if (!claimed) {
+          console.warn(`[BATCH-POLL] Lote ${batch.id} não pôde ser reivindicado (já processando?).`);
           continue;
         }
 
         await this.processSingleBatch(claimed);
       }
     } catch (error) {
+      console.error('[BATCH-POLL] Erro inesperado ao processar lotes:', error);
       await this.logsService.error({
         action: 'conversas.processPendingBatches',
         context: ConversasService.name,
@@ -1819,6 +1930,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
   private async processSingleBatch(batch: ConversationBatch) {
     try {
+      console.log(`[BATCH] Iniciando processamento. batch=${batch.id} conversa=${batch.conversa_id} mensagens=${batch.message_ids.length}`);
       this.logAutomationDebug(batch.id, 'batch.start', {
         conversaId: batch.conversa_id,
         inboundMessageCount: batch.message_ids.length,
@@ -1826,12 +1938,14 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
       const conversation = await this.loadConversationForAutomation(batch.conversa_id);
       if (!conversation) {
+        console.warn(`[BATCH] SKIP - conversa não encontrada. batch=${batch.id} conversa=${batch.conversa_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'conversation_not_found' });
         await this.finishBatch(batch.id);
         return;
       }
 
       if (!conversation.ai_enabled) {
+        console.warn(`[BATCH] SKIP - IA desativada. batch=${batch.id} conversa=${batch.conversa_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'ai_disabled' });
         await this.finishBatch(batch.id);
         return;
@@ -1843,7 +1957,10 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         .eq('profile_id', conversation.profile_id)
         .single();
 
+      console.log(`[BATCH] Verificação de limite: enviadas=${subscription?.mensagens_enviadas ?? 0} / limite=${subscription?.limite_mensagens_mensais ?? 500}`);
+
       if (subscription && (subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500)) {
+        console.warn(`[BATCH] SKIP - limite de mensagens atingido. batch=${batch.id} perfil=${conversation.profile_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'plan_limits_reached' });
         await this.finishBatch(batch.id);
         return;
@@ -1870,6 +1987,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       }>(conversation.contatos);
 
       if (!connection?.instance_name || !contact) {
+        console.warn(`[BATCH] SKIP - conexão ou contato ausente. batch=${batch.id} temContato=${Boolean(contact)} temInstancia=${Boolean(connection?.instance_name)}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           hasContact: Boolean(contact),
           hasInstanceName: Boolean(connection?.instance_name),
@@ -1881,6 +1999,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
       const connectionValidation = await this.validateAutomationConnection(connection);
       if (!connectionValidation.connected) {
+        console.warn(`[BATCH] SKIP - WhatsApp não conectado. batch=${batch.id} instancia=${connection.instance_name} status=${connection.status} liveState=${connectionValidation.liveState}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           connectionStatus: connection.status,
           liveState: connectionValidation.liveState,
@@ -1892,6 +2011,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
       const number = this.normalizeWhatsapp(contact.whatsapp);
       if (!number) {
+        console.warn(`[BATCH] SKIP - número do contato inválido. batch=${batch.id} whatsapp=${contact.whatsapp}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           contactWhatsapp: contact.whatsapp,
           reason: 'invalid_contact_number',
@@ -1910,6 +2030,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         .order('created_at', { ascending: true });
 
       if (messagesError || !inboundMessages?.length) {
+        console.warn(`[BATCH] SKIP - mensagens do lote não encontradas. batch=${batch.id} ids=${batch.message_ids.join(',')} erro=${messagesError?.message}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           messageIds: batch.message_ids,
           reason: 'no_inbound_messages',
@@ -1917,6 +2038,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         await this.finishBatch(batch.id);
         return;
       }
+
+      console.log(`[BATCH] Mensagens carregadas. batch=${batch.id} count=${inboundMessages.length}`);
 
       const preferences = await this.getAutomationPreferences(conversation.profile_id);
       const contextAgentOutput = await this.runConversationContextAgent({
@@ -2004,7 +2127,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         });
         await this.registerHandoff({
           alertAlreadySentAt: conversation.last_attendant_alert_at,
-          assignedUserId: conversation.assigned_user_id,
           connectionInstanceName: connection.instance_name,
           connectionName: connection.nome,
           conversationId: batch.conversa_id,
@@ -2025,6 +2147,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       await this.finishBatch(batch.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      console.error(`[BATCH] ERRO inesperado. batch=${batch.id} conversa=${batch.conversa_id}`, error);
       this.logAutomationDebug(batch.id, 'batch.error', { error: message });
       this.logsService.createLog({
         level: 'error',
@@ -2287,7 +2410,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const pendingScheduleExpired =
       params.conversation.pending_schedule_expires_at &&
       new Date(params.conversation.pending_schedule_expires_at).getTime() <=
-        Date.now();
+      Date.now();
     const pendingOptions = !pendingScheduleExpired &&
       Array.isArray(params.conversation.pending_schedule_options)
       ? params.conversation.pending_schedule_options
@@ -2394,9 +2517,9 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
             'Esse horario acabou de ficar indisponivel.',
             refreshedSlots.length
               ? `Posso te oferecer estas novas opcoes:\n${refreshedSlots
-                  .slice(0, 4)
-                  .map((slot, index) => `${index + 1}. ${slot.label}`)
-                  .join('\n')}`
+                .slice(0, 4)
+                .map((slot, index) => `${index + 1}. ${slot.label}`)
+                .join('\n')}`
               : 'No momento nao encontrei outro horario livre nos proximos dias.',
           ],
         };
@@ -2495,8 +2618,8 @@ ${params.latestCustomerText}
 
 Opcoes pendentes:
 ${params.pendingOptions
-  .map((option) => `- ${option.label} | ${option.startAt}`)
-  .join('\n') || 'nenhuma'}
+              .map((option) => `- ${option.label} | ${option.startAt}`)
+              .join('\n') || 'nenhuma'}
 `,
         },
       ],
@@ -2641,7 +2764,7 @@ ${params.pendingOptions
       agendamento_automatico_ia: boolean;
       alerta_atendentes_intervencao_ia: boolean;
     };
-      recentHistory: Array<{
+    recentHistory: Array<{
       ai_context_text: string | null;
       content: string | null;
       created_at: string;
@@ -2656,7 +2779,7 @@ ${params.pendingOptions
       })
       .join('\n');
 
-      const systemPrompt = `
+    const systemPrompt = `
 Você é o agente de WhatsApp da FLOW para conversas reais com clientes.
 Responda em pt-BR, com tom natural, humano, breve e útil.
 Use o perfil do agente e o conhecimento como fontes principais.
@@ -2832,7 +2955,6 @@ ${JSON.stringify(params.draftReply)}`,
 
   private async registerHandoff(params: {
     alertAlreadySentAt: string | null;
-    assignedUserId: string | null;
     connectionInstanceName: string;
     connectionName: string;
     conversationId: string;
@@ -2870,7 +2992,7 @@ ${JSON.stringify(params.draftReply)}`,
       updated_at: now,
     });
 
-    if (!params.preferenceEnabled || params.assignedUserId || params.alertAlreadySentAt) {
+    if (!params.preferenceEnabled || params.alertAlreadySentAt) {
       return;
     }
 
@@ -3006,6 +3128,11 @@ ${JSON.stringify(params.draftReply)}`,
       last_message_at: now,
       updated_at: now,
     }).eq('id', params.conversationId);
+
+    // Contabiliza todas as mensagens trafegadas (respostas da IA)
+    await this.supabaseService
+      .getClient()
+      .rpc('increment_mensagens_enviadas', { p_profile_id: params.profileId });
   }
 
   private async finishBatch(batchId: string, lastError?: string | null) {

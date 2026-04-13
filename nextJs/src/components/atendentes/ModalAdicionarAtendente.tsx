@@ -121,13 +121,18 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
 
+      const payload = { ...formData };
+      if (editMode && !payload.password) {
+        delete (payload as any).password;
+      }
+
       const method = editMode ? 'PUT' : 'POST';
       const response = await apiFetch(
         editMode ? `/atendentes/${atendente?.id}` : '/atendentes',
         {
           method,
           userId: session.user.id,
-          body: formData,
+          body: payload,
         },
       );
 

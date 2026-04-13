@@ -149,8 +149,7 @@ export class AtendentesService {
           auth_id,
           nome_completo,
           foto_perfil,
-          status,
-          email
+          status
         )
       `)
       .eq('admin_id', adminId)
@@ -158,6 +157,19 @@ export class AtendentesService {
 
     if (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+
+    // Hydrate emails from auth.users via Admin API
+    if (data && data.length > 0) {
+      await Promise.all(data.map(async (atendente) => {
+        const profile = Array.isArray(atendente.profile) ? atendente.profile[0] : atendente.profile;
+        if (profile && (profile as any).auth_id) {
+          const { data: userData } = await supabase.auth.admin.getUserById((profile as any).auth_id);
+          if (userData && userData.user) {
+            (profile as any).email = userData.user.email;
+          }
+        }
+      }));
     }
 
     return data;

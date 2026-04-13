@@ -33,11 +33,12 @@ export class AgendamentosService {
 
   async createAgendamento(profileId: string, data: any) {
     const supabase = this.supabaseService.getClient();
+    const contactName = await this.getContactName(profileId, data.contato_id);
 
     const novo = {
       profile_id: profileId,
       contato_id: data.contato_id,
-      titulo: data.titulo,
+      titulo: this.buildAgendamentoTitle(data.titulo, contactName),
       data_hora: data.data_hora,
       data_hora_fim: data.data_hora_fim,
       status: data.status || 'pendente'
@@ -218,6 +219,49 @@ export class AgendamentosService {
       status: params.status || 'confirmado',
       titulo: params.titulo,
     });
+  }
+
+  private async getContactName(profileId: string, contatoId?: string | null) {
+    if (!contatoId) {
+      return null;
+    }
+
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('contatos')
+      .select('nome')
+      .eq('profile_id', profileId)
+      .eq('id', contatoId)
+      .maybeSingle();
+
+    return data?.nome?.trim() || null;
+  }
+
+  private buildAgendamentoTitle(
+    rawTitle: string | null | undefined,
+    contactName: string | null,
+  ) {
+    const baseTitle = rawTitle?.trim() || 'Agendamento';
+    const normalizedContactName = contactName?.trim() || null;
+
+    if (!normalizedContactName) {
+      return baseTitle;
+    }
+
+    const normalizedBase = this.normalizeText(baseTitle);
+    const normalizedContact = this.normalizeText(normalizedContactName);
+    if (normalizedBase.includes(normalizedContact)) {
+      return baseTitle;
+    }
+
+    return `${baseTitle} - ${normalizedContactName}`;
+  }
+
+  private normalizeText(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
   }
 
   private async getOccupiedIntervals(
