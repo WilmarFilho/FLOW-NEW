@@ -163,23 +163,41 @@ export default function WhatsappPage() {
           } | null;
           if (record?.user_id && record.user_id !== userId) return;
 
-          // Optimistically update SWR cache
+          // Atualiza o cache do SWR com base no evento do Realtime.
+          // IMPORTANTE: o payload do Realtime não inclui dados de joins (agentes_ia, conhecimentos).
+          // Para UPDATE, fazemos merge apenas dos campos escalares e forçamos revalidação para
+          // buscar os dados completos com joins do servidor.
           mutateConnections((current = []) => {
             if (payload.eventType === 'INSERT') {
-              return [payload.new as WhatsappConnection, ...current];
+              // INSERT: revalida para buscar com joins
+              return current;
             } else if (payload.eventType === 'UPDATE') {
-              return current.map((conn) =>
-                conn.id === (payload.new as WhatsappConnection).id
-                  ? { ...conn, ...(payload.new as WhatsappConnection) }
-                  : conn
-              );
+              // Merge apenas campos escalares, preserva os joins existentes no cache
+              return current.map((conn) => {
+                if (conn.id === (payload.new as WhatsappConnection).id) {
+                  const updated = payload.new as WhatsappConnection;
+                  return {
+                    ...conn,
+                    // Atualiza apenas campos escalares que vêm no payload
+                    status: updated.status ?? conn.status,
+                    nome: updated.nome ?? conn.nome,
+                    cor: updated.cor ?? conn.cor,
+                    numero: updated.numero ?? conn.numero,
+                    deleted_at: updated.deleted_at ?? conn.deleted_at,
+                    // Preserva os dados de join que NÃO vêm no Realtime
+                    agentes: conn.agentes,
+                    conhecimentos: conn.conhecimentos,
+                  };
+                }
+                return conn;
+              });
             } else if (payload.eventType === 'DELETE') {
               return current.filter(
                 (conn) => conn.id !== ((payload.old as { id?: string } | null)?.id)
               );
             }
             return current;
-          }, { revalidate: false });
+          }, { revalidate: true });
         }
       )
       .subscribe();
@@ -310,17 +328,22 @@ export default function WhatsappPage() {
 
   const handleReconnect = useCallback(
     async (conn: WhatsappConnection) => {
-      const result = await apiRequest<{ qrCode?: string | null; pairingCode?: string | null; connectionId?: string | null }>(`/whatsapp/${conn.id}/reconnect`, {
-        method: 'POST',
-        userId,
-      });
 
-      mutateConnections();
-      return {
-        qrCode: result?.qrCode || null,
-        pairingCode: result?.pairingCode || null,
-        connectionId: result?.connectionId || conn.id,
-      };
+      try {
+        const result = await apiRequest<{ qrCode?: string | null; pairingCode?: string | null; connectionId?: string | null }>(`/whatsapp/${conn.id}/reconnect`, {
+          method: 'POST',
+          userId,
+        });
+
+        mutateConnections();
+        return {
+          qrCode: result?.qrCode || null,
+          pairingCode: result?.pairingCode || null,
+          connectionId: result?.connectionId || conn.id,
+        };
+      } catch (err) {
+        throw err;
+      }
     },
     [userId, mutateConnections]
   );

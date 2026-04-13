@@ -98,7 +98,6 @@ export default function ContactRenameModal({
             <div className={styles.header}>
               <div>
                 <span className={styles.eyebrow}>Contato</span>
-                <h2 className={styles.title}>{title}</h2>
                 <p className={styles.description}>
                   Ajuste o nome exibido para manter a conversa organizada e o atendimento mais claro.
                 </p>
@@ -127,7 +126,6 @@ export default function ContactRenameModal({
               <div className={styles.summaryText}>
                 <strong>{initialName || 'Contato sem nome'}</strong>
                 <span>
-                  <Phone size={12} style={{ marginRight: 6, verticalAlign: 'text-top' }} />
                   {subtitle || 'Sem número informado'}
                 </span>
               </div>

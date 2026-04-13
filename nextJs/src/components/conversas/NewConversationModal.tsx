@@ -127,7 +127,7 @@ export default function NewConversationModal({
               </button>
             </div>
 
-            <div className={styles.modalBody}>
+            <div className={styles.modalBody} style={{ padding: '32px' }}>
               <section className={styles.modalSection}>
                 <div className={styles.sectionHeader}>
                   <h3>Conexão ativa</h3>
@@ -142,9 +142,8 @@ export default function NewConversationModal({
                       <button
                         key={connection.id}
                         type="button"
-                        className={`${styles.optionCard} ${
-                          isSelected ? styles.optionCardActive : ''
-                        }`}
+                        className={`${styles.optionCard} ${isSelected ? styles.optionCardActive : ''
+                          }`}
                         onClick={() => setConnectionId(connection.id)}
                       >
                         <div className={styles.optionCardContent}>
@@ -211,9 +210,8 @@ export default function NewConversationModal({
                           <button
                             key={contact.id}
                             type="button"
-                            className={`${styles.contactOption} ${
-                              isSelected ? styles.contactOptionActive : ''
-                            }`}
+                            className={`${styles.contactOption} ${isSelected ? styles.contactOptionActive : ''
+                              }`}
                             onClick={() => setContactId(contact.id)}
                           >
                             <div className={styles.contactIdentity}>

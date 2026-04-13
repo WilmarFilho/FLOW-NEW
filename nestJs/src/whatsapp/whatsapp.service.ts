@@ -186,7 +186,7 @@ export class WhatsappService {
       .eq('id', id)
       .eq('user_id', userId)
       .is('deleted_at', null)
-      .select()
+      .select('*, agentes_ia(id, nome), conhecimentos(id, titulo)')
       .single();
 
     if (error) {
@@ -222,30 +222,66 @@ export class WhatsappService {
       throw new NotFoundException('Conexão não encontrada');
     }
 
-    const connectResult = await this.evolutionApi.connectInstance(
-      connection.instance_name,
-    );
+    // Passo 1: Logout + delete da instância antiga para forçar novo QR limpo
+    try {
+      await this.evolutionApi.logoutInstance(connection.instance_name);
+    } catch (e) {
+      this.logger.warn(`logoutInstance ignorado para ${connection.instance_name}: ${e.message}`);
+    }
 
-    const qrCode = connectResult?.base64 || connectResult?.qrcode?.base64 || null;
-    const pairingCode =
-      connectResult?.pairingCode || connectResult?.code || null;
+    try {
+      await this.evolutionApi.deleteInstance(connection.instance_name);
+      // Aguarda a Evolution liberar o nome internamente (race condition conhecida)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } catch (e) {
+      this.logger.warn(`deleteInstance ignorado para ${connection.instance_name}: ${e.message}`);
+    }
 
+    // Passo 2: Recria a instância com o mesmo nome
+    let evolutionResult: any = null;
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        evolutionResult = await this.evolutionApi.createInstance(
+          connection.instance_name,
+          connection.numero || undefined,
+        );
+        break;
+      } catch (e) {
+        this.logger.warn(`createInstance tentativa ${attempt}/${maxRetries} falhou: ${e.message}`);
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+        } else {
+          throw new Error(`Falha ao recriar instância na Evolution API após ${maxRetries} tentativas: ${e.message}`);
+        }
+      }
+    }
+
+    // Passo 3: Atualiza status no banco
     await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
       .update({
         status: 'connecting',
+        qr_code: null,
         ultima_atualizacao: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('user_id', userId);
 
+    // Passo 4: Obtém QR diretamente do connectInstance (igual ao fluxo de criação)
+    const pairingCode: string | null = evolutionResult?.pairingCode || evolutionResult?.code || null;
+    const connectResult = await this.evolutionApi.connectInstance(connection.instance_name);
+    const qrCode: string | null = connectResult?.base64 || connectResult?.qrcode?.base64 || null;
+
     return {
       success: true,
       qrCode,
       pairingCode,
+      connectionId: id,
     };
   }
+
 
   /**
    * Deleta uma conexão e a instância correspondente na Evolution API
@@ -336,10 +372,6 @@ export class WhatsappService {
     const instanceName = payload.instance;
     const normalizedEvent = this.normalizeWebhookEvent(event);
 
-    this.logger.log(
-      `Webhook received: ${event} (${normalizedEvent}) for instance ${instanceName}`,
-    );
-
     if (!instanceName) return { processed: false };
 
     if (normalizedEvent === 'messages.upsert') {
@@ -360,10 +392,10 @@ export class WhatsappService {
 
         // Extrai o número do WhatsApp da resposta da Evolution v2.3
         // O número pode vir em vários campos dependendo do evento
-        const wid = payload.data?.wid || payload.data?.ownerJid;
-        if (wid) {
-          // wid vem no formato "5511999999999@s.whatsapp.net"
-          phoneNumber = wid.split('@')[0] || null;
+        const wuid = payload.data?.wuid || payload.data?.ownerJid;
+        if (wuid) {
+          // wuid vem no formato "5511999999999@s.whatsapp.net"
+          phoneNumber = wuid.split('@')[0] || null;
         }
         if (!phoneNumber && payload.data?.number) {
           phoneNumber = payload.data.number;
@@ -381,6 +413,27 @@ export class WhatsappService {
 
     if (normalizedEvent === 'qrcode.updated') {
       newStatus = 'connecting';
+      // Extrai QR base64 da imagem do payload do webhook
+      // Evolution v2 com webhook_base64=true envia: data.qrcode.base64 (data URI completo)
+      const qrBase64: string | null =
+        payload.data?.qrcode?.base64 ||
+        payload.data?.base64 ||
+        null;
+
+      if (qrBase64) {
+        const updateQr: Record<string, any> = {
+          status: 'connecting',
+          qr_code: qrBase64,
+          ultima_atualizacao: new Date().toISOString(),
+        };
+        await this.supabaseService
+          .getClient()
+          .from('whatsapp_connections')
+          .update(updateQr)
+          .eq('instance_name', instanceName);
+
+        return { processed: true, status: 'connecting', qrCode: true };
+      }
     }
 
     if (!newStatus) return { processed: false, event };
@@ -394,7 +447,6 @@ export class WhatsappService {
     // Se extraiu o número, atualiza também
     if (phoneNumber) {
       updateData.numero = phoneNumber;
-      this.logger.log(`Phone number extracted: ${phoneNumber}`);
     }
 
     // Atualiza no Supabase → Realtime vai propagar pro frontend
@@ -403,8 +455,6 @@ export class WhatsappService {
       .from('whatsapp_connections')
       .update(updateData)
       .eq('instance_name', instanceName);
-
-    console.log(updateData);
 
     if (error) {
       await this.logsService.error({
@@ -417,7 +467,6 @@ export class WhatsappService {
       return { processed: false, error: error.message };
     }
 
-    this.logger.log(`Connection ${instanceName} status updated to ${newStatus}`);
     return { processed: true, status: newStatus, numero: phoneNumber };
   }
 

@@ -17,7 +17,7 @@ export interface WhatsappConnection {
     days?: Record<string, Array<{ start: string; end: string }>>;
   };
   appointment_slot_minutes?: number;
-  agentes?: { id: string; nome: string; tipo_de_agente: string } | null;
+  agentes_ia?: { id: string; nome: string } | null;
   conhecimentos?: { id: string; titulo: string } | null;
   deleted_at?: string | null;
 }
@@ -37,6 +37,7 @@ export default function ConnectionCard({
   onTest,
   onReconnect,
 }: ConnectionCardProps) {
+
   const statusLabel = {
     connected: 'Conectado',
     connecting: 'Conectando',
@@ -94,7 +95,7 @@ export default function ConnectionCard({
           <Bot size={14} />
           <span>Agente:</span>
           <span className={styles.metaValue}>
-            {connection.agentes?.tipo_de_agente || connection.agentes?.nome || 'Nenhum'}
+            {connection.agentes_ia?.nome || 'Nenhum'}
           </span>
         </div>
         <div className={styles.metaItem}>
@@ -117,9 +118,7 @@ export default function ConnectionCard({
 
       {!isDeleted ? (
         <div className={styles.cardActions}>
-          <button className={styles.actionBtn} onClick={() => onEdit(connection)} title="Editar">
-            <Pencil size={14} /> Editar
-          </button>
+
           <button
             className={`${styles.actionBtn} ${styles.actionBtnTest}`}
             onClick={() => onTest(connection)}
@@ -132,9 +131,13 @@ export default function ConnectionCard({
             className={styles.actionBtn}
             onClick={() => onReconnect(connection)}
             title="Reconectar"
-            disabled={connection.status === 'connecting'}
+            style={{ display: connection.status === 'connected' ? 'none' : undefined }}
           >
             <RefreshCcw size={14} /> Reconectar
+          </button>
+
+          <button className={styles.actionBtn} onClick={() => onEdit(connection)} title="Editar">
+            <Pencil size={14} />
           </button>
           <button
             className={`${styles.actionBtn} ${styles.actionBtnDanger}`}

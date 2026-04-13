@@ -271,11 +271,9 @@
   gap: 8px;
 }
 
-
 .saveBtn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* ─── System Items Mock ─── */

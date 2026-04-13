@@ -68,9 +68,6 @@ export class WhatsappWebhookGuard implements CanActivate {
       throw new HttpException('Webhook não autorizado.', HttpStatus.UNAUTHORIZED);
     }
 
-    this.logger.log(
-      `Webhook auth debug: instance=${typeof request.body?.instance === 'string' ? request.body.instance : '[sem-instance]'} headerSecretPreview=${this.previewSecret(headerSecret)} headerSources=${this.describeSecretSources(request)}`,
-    );
 
     if (headerSecret === configuredApiKey) {
       return true;
@@ -86,9 +83,6 @@ export class WhatsappWebhookGuard implements CanActivate {
           : null;
 
       if (bodyApiKey && headerSecret === bodyApiKey) {
-        this.logger.log(
-          `Webhook auth debug: aceitando apikey dinâmica da instância para ${instanceName}.`,
-        );
         return true;
       }
 
@@ -97,9 +91,6 @@ export class WhatsappWebhookGuard implements CanActivate {
         configuredApiKey,
       );
 
-      this.logger.log(
-        `Webhook auth debug: instance=${instanceName} globalPreview=${this.previewSecret(configuredApiKey)} instancePreview=${this.previewSecret(instanceApiKey)}`,
-      );
 
       if (instanceApiKey && headerSecret === instanceApiKey) {
         return true;
@@ -239,9 +230,6 @@ export class WhatsappWebhookGuard implements CanActivate {
         },
       });
 
-      this.logger.log(
-        `Webhook auth debug: fetchInstanceApiKey status=${response.status} url=${url}`,
-      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -260,9 +248,6 @@ export class WhatsappWebhookGuard implements CanActivate {
         };
       }>;
 
-      this.logger.log(
-        `Webhook auth debug: fetchInstanceApiKey payloadType=${Array.isArray(payload) ? 'array' : typeof payload} payloadSize=${Array.isArray(payload) ? payload.length : 0}`,
-      );
 
       const first = Array.isArray(payload) ? payload[0] : null;
       return first?.instance?.apikey?.trim() || null;

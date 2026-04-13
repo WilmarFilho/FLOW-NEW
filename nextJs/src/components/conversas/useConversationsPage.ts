@@ -418,6 +418,20 @@ export function useConversationsPage() {
         return;
       }
 
+      if (payload.eventType === 'INSERT') {
+        void apiRequest<ConversationSummary>(`/conversas/${record.id}`, { userId })
+          .then((newConv) => {
+            setConversations((current) => {
+              if (current.some(c => c.id === newConv.id)) return current;
+              return [newConv, ...current].sort(
+                (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+              );
+            });
+          })
+          .catch(() => undefined);
+        return;
+      }
+
       patchConversationInState(record.id, (current) => ({
         ...current,
         ...record,

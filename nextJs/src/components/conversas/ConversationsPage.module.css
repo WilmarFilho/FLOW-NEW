@@ -114,6 +114,7 @@
   border-radius: 0.95rem;
   background: rgba(255, 255, 255, 0.04);
   text-align: left;
+  cursor: pointer;
   color: #fff;
   transition:
     transform 0.2s ease,
@@ -225,18 +226,7 @@
   color: rgba(255, 255, 255, 0.62);
   font-size: 0.82rem;
   font-weight: 600;
-}
-
-.filterChip:hover,
-.ghostButton:hover,
-.textButton:hover,
-.iconButton:hover,
-.editNameButton,
-.toggleButton:hover,
-.optionCard:hover,
-.contactOption:hover,
-.chatCard:hover {
-  transform: translateY(-1px);
+  cursor: pointer;
 }
 
 .filterChipActive {
@@ -288,6 +278,7 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 1.2rem;
   background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
   text-align: left;
 }
 
@@ -295,6 +286,7 @@
   border-color: rgba(18, 105, 244, 0.42);
   background: rgba(18, 105, 244, 0.12);
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
 }
 
 .chatAvatar,
@@ -302,7 +294,7 @@
 .contactAvatar {
   position: relative;
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 5rem;
   background: linear-gradient(135deg, rgba(18, 105, 244, 0.28) 0%, rgba(8, 24, 58, 0.9) 100%);
   color: #fff;
   font-weight: 800;
@@ -577,9 +569,8 @@
 .messageMenu {
   position: absolute;
   top: 2.3rem;
-  right: 0;
   display: flex;
-  min-width: 13.5rem;
+  min-width: max-content;
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.35rem;
@@ -587,6 +578,16 @@
   border-radius: 0.95rem;
   background: rgba(5, 10, 20, 0.98);
   box-shadow: 0 22px 46px rgba(0, 0, 0, 0.35);
+}
+
+.messageBubbleInbound .messageMenu {
+  left: 0;
+  /* Abre para a direita em mensagens recebidas (esquerda) */
+}
+
+.messageBubbleOutbound .messageMenu {
+  right: 0;
+  /* Abre para a esquerda em mensagens enviadas (direita) */
 }
 
 .messageMenuItem {
@@ -601,6 +602,7 @@
   color: #fff;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .messageMenuItem:hover {
@@ -1246,6 +1248,7 @@
   background: rgba(255, 255, 255, 0.04);
   color: #fff;
   text-align: left;
+  cursor: pointer;
 }
 
 .optionCardActive,

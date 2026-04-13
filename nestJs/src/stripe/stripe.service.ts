@@ -115,14 +115,14 @@ export class StripeService {
   async handlePaymentSucceeded(invoice: any) {
     const customerId = invoice.customer as string;
     const subscriptionId = invoice.subscription as string;
-    
+
     // Retrieve subscription from Stripe to get the product
     const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
     const productId = subscription.items.data[0].price.product as string;
-    
+
     const configuredPlan: Record<string, any> = this.PLANS;
     const planConfig = Object.values(configuredPlan).find(p => p.maxMessages === configuredPlan[productId]?.maxMessages) || configuredPlan[productId];
-    
+
     if (planConfig) {
       const supers = this.supabaseService.getClient();
       // Update usage and limits
@@ -139,8 +139,8 @@ export class StripeService {
           data_proxima_renovacao: new Date(subscription.current_period_end * 1000).toISOString()
         })
         .eq('stripe_customer_id', customerId);
-        
-      this.logger.log(`Assinatura renovada para customer ${customerId} (Plano: ${planConfig.id})`);
+
+
     }
   }
 
@@ -155,7 +155,7 @@ export class StripeService {
       await this.stripe.subscriptions.update(subscriptionId, {
         cancel_at: cancelAt,
       });
-      this.logger.log(`Pagamento falhou para sub ${subscriptionId}. Cancelamento agendado p/ 7 dias.`);
+
     } catch (e) {
       this.logger.error(`Erro ao atualizar cancelamento: ${e.message}`);
     }
@@ -164,7 +164,7 @@ export class StripeService {
   async handleSubscriptionDeleted(subscription: any) {
     const customerId = subscription.customer as string;
     const supers = this.supabaseService.getClient();
-    
+
     // Reverter para Freemium
     await supers
       .from('subscriptions')
@@ -178,8 +178,6 @@ export class StripeService {
         stripe_status: 'canceled'
       })
       .eq('stripe_customer_id', customerId);
-      
-    this.logger.log(`Assinatura cancelada/excluída para customer ${customerId}. Resetado para Freemium.`);
   }
 }
 

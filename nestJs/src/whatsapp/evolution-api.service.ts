@@ -43,7 +43,6 @@ export class EvolutionApiService {
   private async request<T>(method: string, path: string, body?: any): Promise<T | null> {
     try {
       const url = `${this.baseUrl}${path}`;
-      this.logger.log(`Evolution API ${method} ${url}`);
 
       const options: RequestInit = {
         method,
@@ -51,6 +50,7 @@ export class EvolutionApiService {
           'Content-Type': 'application/json',
           apikey: this.apiKey,
         },
+        signal: AbortSignal.timeout(8000), // Evita travamento infinito do fetch
       };
 
       if (body) {
@@ -122,9 +122,9 @@ export class EvolutionApiService {
         ],
         headers: this.webhookSecret
           ? {
-              'x-webhook-secret': this.webhookSecret,
-              Authorization: `Bearer ${this.webhookSecret}`,
-            }
+            'x-webhook-secret': this.webhookSecret,
+            Authorization: `Bearer ${this.webhookSecret}`,
+          }
           : undefined,
       },
     };
@@ -138,6 +138,7 @@ export class EvolutionApiService {
 
   /**
    * Busca o QR Code para conexão
+   * Resposta da Evolution v2: { code: "base64...", pairingCode: "...", count: 1 }
    */
   async connectInstance(instanceName: string): Promise<any> {
     return this.request('GET', `/instance/connect/${instanceName}`);
@@ -162,6 +163,41 @@ export class EvolutionApiService {
    */
   async logoutInstance(instanceName: string): Promise<any> {
     return this.request('DELETE', `/instance/logout/${instanceName}`);
+  }
+
+  /**
+   * Extrai QR code e pairing code da resposta do /instance/connect.
+   * Evolution v2: { code: "2@...", pairingCode: "WZYEH1YY", count: 1 }
+   * O campo `code` é a string bruta do QR (não é base64 de imagem, é o conteúdo para renderizar).
+   * Para exibir como <img>, precisa prefixar com data URI apenas se vier como base64 de imagem.
+   */
+  extractQrAndPairing(result: any): { qrCode: string | null; pairingCode: string | null } {
+    // Evolution v2: `code` é o QR bruto (string tipo "2@xxxxxx...")
+    // Evolution v1 (legado): `base64` ou `qrcode.base64` eram imagens base64
+    const rawCode: string | null =
+      result?.base64 ||
+      result?.qrcode?.base64 ||
+      null;
+
+    const rawQrString: string | null = result?.code || null;
+
+    let qrCode: string | null = null;
+    if (rawCode) {
+      // Era base64 de imagem — prefixar com data URI
+      qrCode = rawCode.startsWith('data:') ? rawCode : `data:image/png;base64,${rawCode}`;
+    } else if (rawQrString) {
+      // Evolution v2 retorna o conteúdo cru do QR como string — o frontend deve renderizá-lo
+      // mas como usamos <img src=>, precisamos do base64 da imagem.
+      // Nesse caso, sinalizamos com null e o frontend mostrará "aguardando via webhook"
+      qrCode = null;
+    }
+
+    const pairingCode: string | null =
+      result?.pairingCode ||
+      result?.code_pairing ||
+      null;
+
+    return { qrCode, pairingCode };
   }
 
   /**

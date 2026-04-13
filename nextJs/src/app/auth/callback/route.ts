@@ -3,10 +3,14 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams, origin: rawOrigin } = new URL(request.url);
   const code = searchParams.get('code');
   // if "next" is in param, use it as the redirect URL
   const next = searchParams.get('next') ?? '/home';
+
+  // Em produção com Docker/Nginx, o origin pode ser o endereço interno (0.0.0.0:3000).
+  // Priorizamos a variável de ambiente NEXT_PUBLIC_APP_URL para garantir o domínio público correto.
+  const origin = process.env.NEXT_PUBLIC_APP_URL || rawOrigin;
 
   if (code) {
     const cookieStore = await cookies();

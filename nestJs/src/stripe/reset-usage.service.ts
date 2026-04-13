@@ -6,14 +6,14 @@ import { SupabaseService } from '../supabase/supabase.service';
 export class ResetUsageService {
   private readonly logger = new Logger(ResetUsageService.name);
 
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(private supabaseService: SupabaseService) { }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleCron() {
-    this.logger.log('Executando limpeza mensal de limites freemium e assinaturas expiradas');
+
     try {
       const supers = this.supabaseService.getClient();
-      
+
       const hoje = new Date().toISOString();
 
       // Buscar todos os usuários cuja data de renovação passou
@@ -41,7 +41,7 @@ export class ResetUsageService {
                 data_proxima_renovacao: nextDate.toISOString()
               })
               .eq('id', sub.id);
-            this.logger.log(`Resetei freemium ID: ${sub.id}`);
+
           }
         }
       }

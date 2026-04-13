@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, QrCode, Smartphone, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import SearchablePicker from './SearchablePicker';
@@ -167,12 +167,24 @@ export default function ConnectionModal({
     setError('');
   }, [connection, editMode, isOpen, reconnectMode]);
 
+  // Usa ref para capturar onReconnect apenas uma vez na abertura do modal,
+  // evitando loop infinito causado pela recriação da função a cada render.
+  const onReconnectRef = useRef(onReconnect);
   useEffect(() => {
-    if (!isOpen || !reconnectMode || !connection?.id || !onReconnect) {
+    onReconnectRef.current = onReconnect;
+  });
+
+  // Flag para garantir que o useEffect de reconexão dispara apenas uma vez por abertura.
+  const reconnectFiredRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen || !reconnectMode || !connection?.id) {
+      reconnectFiredRef.current = false;
       return;
     }
 
-    let cancelled = false;
+    if (reconnectFiredRef.current) return;
+    reconnectFiredRef.current = true;
 
     const runReconnect = async () => {
       setIsLoading(true);
@@ -181,35 +193,39 @@ export default function ConnectionModal({
       setPendingConnectionId(connection.id);
 
       try {
-        const result = await onReconnect(connection.id);
+        const result = await onReconnectRef.current?.(connection.id);
 
-        if (cancelled) {
-          return;
+        if (result?.qrCode) {
+          setQrCode(result.qrCode);
         }
-
-        setQrCode(result?.qrCode || null);
-        setPairingCode(result?.pairingCode || null);
+        if (result?.pairingCode) {
+          setPairingCode(result.pairingCode);
+        }
         setPendingConnectionId(result?.connectionId || connection.id);
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Erro ao reconectar conexao.');
-        }
+        setError(err instanceof Error ? err.message : 'Erro ao reconectar conexao.');
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     };
 
     void runReconnect();
 
     return () => {
-      cancelled = true;
+      // cleanup sem cancelled logic para evitar bugs com Strict Mode + reconnectFiredRef
     };
-  }, [connection?.id, isOpen, onReconnect, reconnectMode]);
+  // Apenas isOpen e reconnectMode como deps — connection.id é lido via closure estável
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, reconnectMode]);
 
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (!pendingConnectionId || step !== 6) {
+    onCloseRef.current = onClose;
+  });
+
+  // Realtime: escuta atualizações de status (connected) durante o pareamento
+  useEffect(() => {
+    if (!pendingConnectionId) {
       return;
     }
 
@@ -223,10 +239,24 @@ export default function ConnectionModal({
           table: 'whatsapp_connections',
         },
         (payload) => {
-          const updated = payload.new as { id?: string; status?: string } | null;
-          if (updated?.id === pendingConnectionId && updated.status === 'connected') {
-            setIsConnected(true);
-            setStep(7);
+          const updated = payload.new as { id?: string; status?: string; qr_code?: string } | null;
+
+          if (updated?.id === pendingConnectionId) {
+            if (updated.qr_code) {
+              setQrCode(updated.qr_code);
+            }
+
+            if (updated.status === 'connected') {
+              setIsConnected(true);
+              if (reconnectMode) {
+                setTimeout(() => {
+                  reconnectFiredRef.current = false;
+                  onCloseRef.current();
+                }, 1500);
+              } else {
+                setStep(7);
+              }
+            }
           }
         },
       )
@@ -235,7 +265,7 @@ export default function ConnectionModal({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [pendingConnectionId, step]);
+  }, [pendingConnectionId]);
 
   const stepMeta = useMemo(() => {
     if (step === 7) {

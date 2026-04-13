@@ -69,7 +69,7 @@ export default function ConfiguracoesPage({ initialData }: ConfiguracoesPageProp
   const handleGerenciarAssinatura = async () => {
     setIsLoadingPortal(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const res = await fetch(`${apiUrl}/stripe/customer-portal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
