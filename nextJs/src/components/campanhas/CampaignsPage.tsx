@@ -581,7 +581,7 @@ export default function CampaignsPage() {
           )}
           {view !== 'create' && (
             <button
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
+              className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
               onClick={openCreate}
             >
               <Send size={18} />
@@ -652,12 +652,9 @@ export default function CampaignsPage() {
                       <Radio size={34} />
                     </div>
                     <h2 className="m-0 text-[28px] text-white">Nenhuma campanha criada ainda</h2>
-                    <p className="m-0 max-w-[560px] leading-7 text-white/55">
-                      Crie sua primeira campanha selecionando um WhatsApp conectado, uma lista de contatos e o contexto
-                      que vai orientar as mensagens dinâmicas. Depois disso, você inicia o disparo quando estiver pronto.
-                    </p>
+
                     <button
-                      className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
+                      className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
                       onClick={openCreate}
                     >
                       <Send size={18} />
@@ -874,11 +871,10 @@ export default function CampaignsPage() {
                                               : '',
                                         }))
                                       }
-                                      className={`rounded-[20px] border px-4 py-4 text-left transition ${
-                                        isActive
-                                          ? 'border-[rgba(242,228,22,0.22)] bg-[rgba(242,228,22,0.08)]'
-                                          : 'border-white/8 bg-white/4 hover:border-white/12 hover:bg-white/6'
-                                      }`}
+                                      className={`rounded-[20px] border px-4 py-4 text-left transition ${isActive
+                                        ? 'border-[rgba(242,228,22,0.22)] bg-[rgba(242,228,22,0.08)]'
+                                        : 'border-white/8 bg-white/4 hover:border-white/12 hover:bg-white/6'
+                                        }`}
                                     >
                                       <strong className="block text-[15px] text-white">{option.title}</strong>
                                       <p className="mt-2 text-[13px] leading-6 text-white/55">{option.description}</p>

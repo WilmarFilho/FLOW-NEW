@@ -7,13 +7,18 @@ import {
   Post,
   Put,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { AtendentesService } from './atendentes.service';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
+import { CreateAtendenteDto } from './dto/create-atendente.dto';
+import { UpdateAtendenteDto } from './dto/update-atendente.dto';
 
 @Controller('atendentes')
 @UseGuards(AdminGuard)
+@UsePipes(new ValidationPipe({ whitelist: true }))
 export class AtendentesController {
   constructor(private readonly service: AtendentesService) {}
 
@@ -23,7 +28,7 @@ export class AtendentesController {
   }
 
   @Post()
-  async create(@CurrentUserId() userId: string, @Body() dto: any) {
+  async create(@CurrentUserId() userId: string, @Body() dto: CreateAtendenteDto) {
     return this.service.createAtendente(userId, dto);
   }
 
@@ -31,7 +36,7 @@ export class AtendentesController {
   async update(
     @Param('id') id: string,
     @CurrentUserId() userId: string,
-    @Body() dto: any,
+    @Body() dto: UpdateAtendenteDto,
   ) {
     return this.service.updateAtendente(userId, id, dto);
   }

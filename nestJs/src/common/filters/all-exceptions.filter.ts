@@ -60,10 +60,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       });
     }
 
+    const errorMessage =
+      exceptionResponse &&
+      typeof exceptionResponse === 'object' &&
+      'message' in exceptionResponse
+        ? exceptionResponse['message']
+        : message;
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
+      message: errorMessage,
     });
   }
 }

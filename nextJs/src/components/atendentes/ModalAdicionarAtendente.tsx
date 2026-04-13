@@ -108,6 +108,12 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.nome_completo.trim().length < 3) {
+      setError('O nome de atendente precisa ter no mínimo 3 caracteres.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -127,7 +133,10 @@ export default function ModalAdicionarAtendente({ onClose, onSuccess, editMode =
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.message || 'Erro ao salvar atendente');
+        const errorMessage = Array.isArray(result.message)
+          ? result.message[0]
+          : result.message || 'Erro ao salvar atendente';
+        throw new Error(errorMessage);
       }
 
       onSuccess();

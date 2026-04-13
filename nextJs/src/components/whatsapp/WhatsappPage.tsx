@@ -185,7 +185,7 @@ export default function WhatsappPage() {
                     numero: updated.numero ?? conn.numero,
                     deleted_at: updated.deleted_at ?? conn.deleted_at,
                     // Preserva os dados de join que NÃO vêm no Realtime
-                    agentes: conn.agentes,
+                    agentes: conn.agentes_ia,
                     conhecimentos: conn.conhecimentos,
                   };
                 }
