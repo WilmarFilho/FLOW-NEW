@@ -137,8 +137,8 @@ export default function AtendentesPage() {
         <motion.button
           className={styles.addButton}
           onClick={() => setIsModalOpen(true)}
-          whileHover={{ scale: 1.04, y: -2 }}
-          whileTap={{ scale: 0.97 }}
+          
+          
         >
           <Plus size={18} />
           <span>Novo Atendente</span>

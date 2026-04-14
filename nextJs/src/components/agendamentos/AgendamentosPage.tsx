@@ -317,8 +317,6 @@ export default function AgendamentosPage() {
         <motion.button
           className={styles.addButton}
           onClick={openNewEventModal}
-          whileHover={{ scale: 1.04, y: -2 }}
-          whileTap={{ scale: 0.97 }}
         >
           <Plus size={18} />
           <span>Novo Agendamento</span>

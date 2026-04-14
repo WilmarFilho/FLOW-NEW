@@ -55,8 +55,8 @@
 }
 
 .addButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(242, 228, 22, 0.3);
+  transform: translateY(-1px);
+  
   background: var(--color-secondary-dark);
 }
 
@@ -695,7 +695,7 @@
 }
 
 .sendBtn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 8px 25px rgba(18, 105, 244, 0.35);
 }
 
@@ -814,7 +814,7 @@
 }
 
 .submitBtn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: 0 8px 25px rgba(18, 105, 244, 0.35);
 }
 

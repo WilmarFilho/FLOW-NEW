@@ -581,7 +581,7 @@ export default function CampaignsPage() {
           )}
           {view !== 'create' && (
             <button
-              className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
+              className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[14px] bg-[var(--color-secondary)] px-5 font-bold text-[var(--color-aux-black)] transition-all hover:-translate-y-0.5"
               onClick={openCreate}
             >
               <Send size={18} />
@@ -654,7 +654,7 @@ export default function CampaignsPage() {
                     <h2 className="m-0 text-[28px] text-white">Nenhuma campanha criada ainda</h2>
 
                     <button
-                      className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#ffe664_0%,var(--color-secondary)_100%)] px-5 font-bold text-[var(--color-aux-black)] shadow-[0_16px_32px_rgba(242,228,22,0.18)] transition hover:-translate-y-0.5"
+                      className="inline-flex cursor-pointer min-h-[50px] items-center justify-center gap-2 rounded-[14px] bg-[var(--color-secondary)] px-5 font-bold text-[var(--color-aux-black)] transition-all hover:-translate-y-0.5"
                       onClick={openCreate}
                     >
                       <Send size={18} />

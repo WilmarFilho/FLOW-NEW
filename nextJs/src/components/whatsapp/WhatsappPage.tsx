@@ -385,9 +385,7 @@ export default function WhatsappPage() {
         <motion.button
           className={styles.addButton}
           onClick={() => setShowCreateModal(true)}
-          whileHover={{ scale: 1.04, y: -2 }}
-          whileTap={{ scale: 0.97 }}
-          transition={{ type: 'spring' as const, stiffness: 400, damping: 17 }}
+
         >
           <Plus size={18} />
           Adicionar Conexão

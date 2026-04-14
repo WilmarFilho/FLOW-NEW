@@ -68,23 +68,25 @@ export default function ContatosClient() {
         </div>
 
         {isAdmin && activeTab === 'kanban' && (
-          <button
+          <motion.button
             onClick={() => setIsNovaListaOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-secondary)] text-[var(--color-aux-black)] border-none rounded-[14px] text-[15px] font-bold cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(242,228,22,0.3)] whitespace-nowrap"
+            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-secondary)] text-[var(--color-aux-black)] border-none rounded-[14px] text-[15px] font-bold cursor-pointer transition-all hover:bg-[var(--color-secondary-dark)] hover:-translate-y-[1px] whitespace-nowrap"
+
           >
             <Plus size={18} />
             Nova Lista
-          </button>
+          </motion.button>
         )}
 
         {activeTab === 'lista' && (
-          <button
+          <motion.button
             onClick={() => setIsNovoContatoOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-secondary)] text-[var(--color-aux-black)] border-none rounded-[14px] text-[15px] font-bold cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(242,228,22,0.3)] whitespace-nowrap"
+            className="flex items-center gap-2 px-6 py-3 bg-[var(--color-secondary)] text-[var(--color-aux-black)] border-none rounded-[14px] text-[15px] font-bold cursor-pointer transition-all hover:bg-[var(--color-secondary-dark)] hover:-translate-y-[1px] whitespace-nowrap"
+
           >
             <Plus size={18} />
             Novo Contato
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -92,22 +94,20 @@ export default function ContatosClient() {
       <div className="flex items-center gap-2 mb-4 bg-white/5 border border-white/10 p-1.5 rounded-xl w-fit flex-shrink-0">
         <button
           onClick={() => setActiveTab('kanban')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'kanban' 
-              ? 'bg-white/10 text-white shadow-sm' 
-              : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'kanban'
+            ? 'bg-white/10 text-white shadow-sm'
+            : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+            }`}
         >
           <KanbanSquare size={16} />
           <span>Kanban CRM</span>
         </button>
         <button
           onClick={() => setActiveTab('lista')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'lista' 
-              ? 'bg-white/10 text-white shadow-sm' 
-              : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'lista'
+            ? 'bg-white/10 text-white shadow-sm'
+            : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+            }`}
         >
           <Users size={16} />
           <span>Lista de Contatos</span>
@@ -126,7 +126,7 @@ export default function ContatosClient() {
             className="w-full h-full flex flex-col"
           >
             {activeTab === 'kanban' ? (
-              <KanbanBoard 
+              <KanbanBoard
                 isAdmin={isAdmin}
                 isNovaListaOpen={isNovaListaOpen}
                 onCloseNovaLista={() => setIsNovaListaOpen(false)}
@@ -139,7 +139,7 @@ export default function ContatosClient() {
       </div>
 
       {mounted && isNovoContatoOpen && createPortal(
-        <ModalNovoContato 
+        <ModalNovoContato
           onClose={() => setIsNovoContatoOpen(false)}
           onSubmit={handleCreateContato}
         />,
