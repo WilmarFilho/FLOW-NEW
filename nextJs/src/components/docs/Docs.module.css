@@ -6,17 +6,18 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #0d1117;
-  /* Cinza escuro profundo */
+  background: linear-gradient(rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.9)), url('/assets/bgDark.webp') center/cover no-repeat;
+  background-attachment: fixed;
   color: #c9d1d9;
-  /* Texto claro */
 }
 
 /* ─── Header Superior ─── */
 .header {
   height: 84px;
-  background-color: #161b22;
-  border-bottom: 1px solid #30363d;
+  background-color: rgba(0, 0, 0, 1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -55,7 +56,8 @@
 .searchBar {
   display: flex;
   align-items: center;
-  background-color: #0d1117;
+  background-color: rgba(13, 17, 23, 0.6);
+  backdrop-filter: blur(8px);
   border: 1px solid #30363d;
   border-radius: 8px;
   padding: 8px 12px;
@@ -66,9 +68,10 @@
 }
 
 .searchBar:focus-within {
-  background-color: #0d1117;
+  background-color: rgba(13, 17, 23, 0.8);
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(18, 105, 244, 0.4);
+  box-shadow: 0 0 0 3px rgba(18, 105, 244, 0.25);
+  transform: scale(1.02);
 }
 
 .searchInput {
@@ -128,13 +131,14 @@
 /* ─── Sidebar Lateral ─── */
 .sidebar {
   width: 280px;
-  border-right: 1px solid #30363d;
+  border-right: 1px solid rgba(48, 54, 61, 0.5);
   padding: 32px 34px;
   overflow-y: auto;
   position: sticky;
-  top: 64px;
-  height: calc(100vh - 64px);
-  background-color: #0d1117;
+  top: 84px;
+  /* Ajustado para bater com a altura do header real */
+  height: calc(100vh - 84px);
+  background-color: transparent;
 }
 
 .sidebarSection {
@@ -176,6 +180,8 @@
 .sidebarBtn:hover {
   background-color: rgba(255, 255, 255, 0.05);
   color: #c9d1d9;
+  padding-left: 16px;
+  box-shadow: inset 3px 0 0 0 var(--color-primary);
 }
 
 .sidebarBtnActive {
@@ -192,10 +198,90 @@
   border-left: 1px solid #30363d;
 }
 
+.docInnerLayout {
+  display: flex;
+  gap: 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .article {
+  flex: 1;
   font-size: 16px;
   line-height: 1.7;
   color: #c9d1d9;
+  min-width: 0;
+  /* Impede overflow no flex child */
+}
+
+/* ─── Table of Contents (Right Sidebar) ─── */
+.tocSidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .tocSidebar {
+    display: block;
+  }
+}
+
+.tocFixed {
+  position: sticky;
+  top: 100px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.tocTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.tocList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 1px solid #30363d;
+}
+
+.tocLink {
+  display: block;
+  font-size: 13px;
+  color: #8b949e;
+  text-decoration: none;
+  padding: 4px 0 4px 16px;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.tocLink:hover {
+  color: var(--color-primary);
+}
+
+.tocLink::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+.tocLink:hover::before {
+  background-color: var(--color-primary);
 }
 
 .article h1 {
@@ -206,6 +292,7 @@
   margin-bottom: 24px;
   line-height: 1.2;
 }
+
 
 .article h2 {
   font-size: 24px;
@@ -233,15 +320,26 @@
 .article ol {
   margin-bottom: 24px;
   padding-left: 24px;
+  list-style-type: disc;
 }
 
 .article li {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  line-height: 1.6;
 }
 
 .article strong {
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
+}
+
+:global(.docs-inline-code) {
+  background-color: rgba(110, 118, 129, 0.4);
+  color: #c9d1d9;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 85%;
 }
 
 .article blockquote {
@@ -275,19 +373,22 @@
   display: flex;
   flex-direction: column;
   padding: 24px;
-  background-color: #161b22;
+  background-color: rgba(22, 27, 34, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid #30363d;
   border-radius: 12px;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   cursor: pointer;
   text-align: left;
 }
 
 .card:hover {
+  background-color: rgba(30, 36, 45, 0.9);
   border-color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(18, 105, 244, 0.2);
+  transform: translateY(-4px) scale(1.01);
 }
 
 .card h3 {

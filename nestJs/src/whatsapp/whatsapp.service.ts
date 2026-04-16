@@ -258,6 +258,7 @@ export class WhatsappService {
     }
 
     // Passo 3: Atualiza status no banco
+    console.log(`[WhatsappService] reconnectConnection - Alterando status da conexão ${connection.instance_name} para connecting no Supabase.`);
     await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
@@ -308,6 +309,7 @@ export class WhatsappService {
     }
 
     // Soft delete no Supabase para preservar histórico
+    console.log(`[WhatsappService] deleteConnection - Alterando status da conexão id=${id} para disconnected no Supabase.`);
     const { error } = await this.supabaseService
       .getClient()
       .from('whatsapp_connections')
@@ -405,7 +407,24 @@ export class WhatsappService {
         normalizedState === 'closed' ||
         normalizedState === 'disconnected'
       ) {
-        newStatus = 'disconnected';
+        // Evolution (Baileys) dispara muitos webhooks 'close' falsos e rápidos de milissegundos.
+        // Vamos fazer um double-check real na API antes de decretar como desconectado.
+        try {
+          const liveStatus = await this.evolutionApi.getInstanceStatus(instanceName);
+          const realState = this.normalizeWebhookState(
+            liveStatus?.instance?.state || liveStatus?.state || liveStatus?.status
+          );
+          
+          if (realState === 'open' || realState === 'connected') {
+            console.log(`[WhatsappService] handleWebhook - Falso disconnect ignorado para ${instanceName}. A instância continua open.`);
+            newStatus = 'connected';
+          } else {
+            newStatus = 'disconnected';
+          }
+        } catch (e) {
+          console.log(`[WhatsappService] handleWebhook - Falha no double-check de disconnect para ${instanceName}: ${e.message}`);
+          newStatus = 'disconnected';
+        }
       } else if (normalizedState === 'connecting') {
         newStatus = 'connecting';
       }
@@ -426,6 +445,7 @@ export class WhatsappService {
           qr_code: qrBase64,
           ultima_atualizacao: new Date().toISOString(),
         };
+        console.log(`[WhatsappService] handleWebhook - Alterando status da conexão ${instanceName} para connecting no Supabase (QR Code updated).`);
         await this.supabaseService
           .getClient()
           .from('whatsapp_connections')
@@ -450,6 +470,7 @@ export class WhatsappService {
     }
 
     // Atualiza no Supabase → Realtime vai propagar pro frontend
+    console.log(`[WhatsappService] handleWebhook (event: ${normalizedEvent}) - Alterando status da conexão ${instanceName} para ${newStatus} no Supabase.`);
     const { error } = await this.supabaseService
       .getClient()
       .from('whatsapp_connections')

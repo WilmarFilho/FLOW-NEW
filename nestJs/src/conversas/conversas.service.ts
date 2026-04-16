@@ -463,18 +463,18 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
     const payload = normalizedAssignedUserId
       ? {
-          assigned_at: now,
-          assigned_user_id: normalizedAssignedUserId,
-          human_intervention_reason: null,
-          human_intervention_requested_at: null,
-          last_attendant_alert_at: null,
-          updated_at: now,
-        }
+        assigned_at: now,
+        assigned_user_id: normalizedAssignedUserId,
+        human_intervention_reason: null,
+        human_intervention_requested_at: null,
+        last_attendant_alert_at: null,
+        updated_at: now,
+      }
       : {
-          assigned_at: null,
-          assigned_user_id: null,
-          updated_at: now,
-        };
+        assigned_at: null,
+        assigned_user_id: null,
+        updated_at: now,
+      };
 
     const { data, error } = await this.supabaseService
       .getClient()
@@ -2196,24 +2196,56 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     instance_name: string;
     status: string;
   }) {
+    // 1. Double check no Supabase (buscar o status real atualizado do banco)
+    const { data: supabaseConn } = await this.supabaseService
+      .getClient()
+      .from('whatsapp_connections')
+      .select('status')
+      .eq('id', connection.id)
+      .single();
+
+    const supabaseStatus = supabaseConn?.status || connection.status;
+
+    // 2. Consulta Evolution API
     const liveStatus = await this.evolutionApiService.getInstanceStatus(
       connection.instance_name,
     );
     const liveState = this.normalizeEvolutionConnectionState(liveStatus);
-    const connected = connection.status === 'connected' && liveState === 'connected';
+
+    // 3. Somente se as DUAS fontes dão desconectada retorna false
+    // Se for 'connecting', consideramos não conectado para envio ativo, mas
+    // o requisito pedido é "somente se as duas fontes dão desconectada retorna false",
+    // ou seja: se pelo menos uma não for desconectada (for connected / connecting), connected = true
+    const isSupabaseDisconnected = supabaseStatus !== 'connected';
+    const isEvolutionDisconnected = liveState !== 'connected';
+
+    const connected = !(isSupabaseDisconnected && isEvolutionDisconnected);
 
     this.logAutomationDebug(connection.id, 'connection.validation', {
-      dbStatus: connection.status,
+      dbStatus: supabaseStatus,
       instanceName: connection.instance_name,
       liveState,
+      doubleCheckConnected: connected,
     });
 
-    if (!connected && connection.status === 'connected') {
+    if (!connected && supabaseStatus === 'connected') {
+      console.log(`[ConversasService] validateAutomationConnection - Alterando status da conexão ${connection.instance_name} para ${liveState === 'connecting' ? 'connecting' : 'disconnected'} no Supabase (Double Check falhou).`);
       await this.supabaseService
         .getClient()
         .from('whatsapp_connections')
         .update({
           status: liveState === 'connecting' ? 'connecting' : 'disconnected',
+          ultima_atualizacao: new Date().toISOString(),
+        })
+        .eq('id', connection.id);
+    } else if (connected && supabaseStatus !== 'connected' && liveState === 'connected') {
+      // Auto-healing (Evolution diz que está conectado, mas o Supabase achava que não)
+      console.log(`[ConversasService] validateAutomationConnection - Auto-repair: Alterando status da conexão ${connection.instance_name} de volta para connected no Supabase.`);
+      await this.supabaseService
+        .getClient()
+        .from('whatsapp_connections')
+        .update({
+          status: 'connected',
           ultima_atualizacao: new Date().toISOString(),
         })
         .eq('id', connection.id);
@@ -2527,12 +2559,41 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (schedulingDecision.intent === 'ask_availability') {
-      const slots = await this.agendamentosService.getAvailableSlots({
+      // Calcula a janela de busca com base na preferência do cliente (ex: "próxima sexta", "dia 20")
+      const preferredStart = schedulingDecision.preferredDateStart
+        ? new Date(schedulingDecision.preferredDateStart)
+        : null;
+      const preferredEnd = schedulingDecision.preferredDateEnd
+        ? new Date(schedulingDecision.preferredDateEnd)
+        : null;
+
+      // Se o cliente pediu uma data específica, buscamos slots a partir dessa data com uma janela de 14 dias
+      // para garantir que encontremos horários disponíveis caso o período solicitado não tenha nenhum
+      const searchFromDate = preferredStart && preferredStart > new Date() ? preferredStart : null;
+      const daysFromNowToPreferred = searchFromDate
+        ? Math.ceil((searchFromDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        : 0;
+      const daysAhead = Math.max(7, daysFromNowToPreferred + 14);
+
+      const allSlots = await this.agendamentosService.getAvailableSlots({
         businessHours: params.whatsappBusinessHours,
-        daysAhead: 7,
+        daysAhead,
         profileId: params.profileId,
         slotMinutes: params.slotMinutes,
       });
+
+      // Filtra apenas os slots dentro da janela preferida pelo cliente, se houver
+      let slots = allSlots;
+      if (preferredStart || preferredEnd) {
+        const windowStart = preferredStart ?? new Date(0);
+        const windowEnd = preferredEnd ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        const slotsInWindow = allSlots.filter((slot) => {
+          const slotDate = new Date(slot.startAt);
+          return slotDate >= windowStart && slotDate <= windowEnd;
+        });
+        // Se encontrou slots no período pedido usa eles; senão usa todos os disponíveis com aviso
+        slots = slotsInWindow.length > 0 ? slotsInWindow : allSlots;
+      }
 
       if (!slots.length) {
         return {
@@ -2546,6 +2607,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       const selectedSlots = slots.slice(0, 4);
       await this.supabaseService.getClient().from('conversas').update({
         pending_schedule_context: {
+          preferredDateEnd: schedulingDecision.preferredDateEnd,
+          preferredDateStart: schedulingDecision.preferredDateStart,
           requestedAt: new Date().toISOString(),
           title:
             schedulingDecision.title || `Agendamento - ${params.contactName}`,
@@ -2557,9 +2620,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         updated_at: new Date().toISOString(),
       }).eq('id', params.conversationId);
 
+      const hadPreference = preferredStart || preferredEnd;
       return {
         parts: [
-          'Posso te oferecer estes horarios disponiveis:',
+          hadPreference
+            ? 'Aqui estao os horarios disponiveis no periodo que voce pediu:'
+            : 'Posso te oferecer estes horarios disponiveis:',
           selectedSlots
             .map(
               (slot, index) =>
@@ -2587,10 +2653,14 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     if (directSelection) {
       return {
         intent: 'confirm' as const,
+        preferredDateEnd: null as string | null,
+        preferredDateStart: null as string | null,
         selectedStartAt: directSelection.startAt,
         title: null,
       };
     }
+
+    const todayIso = new Date().toISOString();
 
     const completion = await this.openai.chat.completions.create({
       model: this.responseModel,
@@ -2600,15 +2670,20 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         {
           role: 'system',
           content: `Analise a mensagem do cliente para detectar intencao de agendamento.
+Data de hoje (referencia): ${todayIso}
 Retorne JSON:
 {
   "intent": "none" | "ask_availability" | "confirm",
   "selectedStartAt": "iso-or-null",
-  "title": "titulo-curto-ou-null"
+  "title": "titulo-curto-ou-null",
+  "preferredDateStart": "iso-ou-null",
+  "preferredDateEnd": "iso-ou-null"
 }
 Use "ask_availability" quando o cliente quiser marcar, agendar, reservar horario, consulta ou visita.
 Use "confirm" apenas quando ele claramente escolher uma das opcoes pendentes.
-Se houver opcoes pendentes, escolha selectedStartAt apenas entre elas.`,
+Se houver opcoes pendentes, escolha selectedStartAt apenas entre elas.
+Se o cliente mencionar uma data ou periodo especifico (ex: "proximo mes", "dia 20", "semana que vem", "na sexta", "depois do dia 25", "no mes que vem"), preencha preferredDateStart e preferredDateEnd com o inicio e fim desse periodo em ISO 8601 UTC. Por exemplo, se disser "na proxima sexta", calcule a data correta relativa a hoje.
+Se nao houver preferencia de data clara, deixe preferredDateStart e preferredDateEnd como null.`,
         },
         {
           role: 'user',
@@ -2630,18 +2705,24 @@ ${params.pendingOptions
         completion.choices[0]?.message?.content || '{}',
       ) as {
         intent?: 'none' | 'ask_availability' | 'confirm';
+        preferredDateEnd?: string | null;
+        preferredDateStart?: string | null;
         selectedStartAt?: string | null;
         title?: string | null;
       };
 
       return {
         intent: parsed.intent || 'none',
+        preferredDateEnd: parsed.preferredDateEnd || null,
+        preferredDateStart: parsed.preferredDateStart || null,
         selectedStartAt: parsed.selectedStartAt || null,
         title: parsed.title || null,
       };
     } catch {
       return {
         intent: 'none' as const,
+        preferredDateEnd: null,
+        preferredDateStart: null,
         selectedStartAt: null,
         title: null,
       };

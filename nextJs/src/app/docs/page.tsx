@@ -1,35 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, BookOpenText, Users, MessageSquareShare, ArrowRight } from 'lucide-react';
+import { Search, BookOpenText, Users, MessageSquareShare, ArrowRight, List } from 'lucide-react';
 import { DOCS_DATA, getDocBySlug } from '@/lib/docsData';
 import styles from '@/components/docs/Docs.module.css';
 
+function slugify(text: string) {
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD') // divide into base letters and diacritical marks
+    .replace(/[\u0300-\u036f]/g, '') // remove diacritical marks
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-');
+}
+
 export default function DocsMainPage() {
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [activeSlug, setActiveSlug] = useState<string | null>('introducao');
+
+  const activeDoc = activeSlug ? getDocBySlug(activeSlug) : null;
+
+  // Extract headings for Table of Contents
+  const toc = useMemo(() => {
+    if (!activeDoc) return [];
+    const lines = activeDoc.content.trim().split('\n');
+    const headings: { id: string; text: string; level: number }[] = [];
+    
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('## ')) {
+        const text = trimmed.substring(3).replace(/\*\*/g, '').replace(/\`/g, '');
+        headings.push({ id: slugify(text), text, level: 2 });
+      } else if (trimmed.startsWith('### ')) {
+        const text = trimmed.substring(4).replace(/\*\*/g, '').replace(/\`/g, '');
+        headings.push({ id: slugify(text), text, level: 3 });
+      }
+    });
+
+    return headings;
+  }, [activeDoc]);
 
   // A simple markdown renderer just for demonstration.
   const renderMarkdownText = (text: string) => {
     const lines = text.trim().split('\n');
     return lines.map((line, idx) => {
       const trimmed = line.trim();
+      
+      const parseInline = (str: string) => {
+        let parsed = str.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        parsed = parsed.replace(/\`(.*?)\`/g, '<code class="docs-inline-code">$1</code>');
+        return parsed;
+      };
+
       if (trimmed.startsWith('# ')) {
-        return <h1 key={idx}>{trimmed.substring(2)}</h1>;
+        return <h1 key={idx}>{parseInline(trimmed.substring(2))}</h1>;
       } else if (trimmed.startsWith('## ')) {
-        return <h2 key={idx}>{trimmed.substring(3)}</h2>;
+        const title = trimmed.substring(3);
+        const slg = slugify(title.replace(/\*\*/g, '').replace(/\`/g, ''));
+        return <h2 key={idx} id={slg}>{parseInline(title)}</h2>;
       } else if (trimmed.startsWith('### ')) {
-        return <h3 key={idx}>{trimmed.substring(4)}</h3>;
+        const title = trimmed.substring(4);
+        const slg = slugify(title.replace(/\*\*/g, '').replace(/\`/g, ''));
+        return <h3 key={idx} id={slg}>{parseInline(title)}</h3>;
       } else if (trimmed.startsWith('- ')) {
-        const parseBold = trimmed.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        return <ul key={idx}><li dangerouslySetInnerHTML={{ __html: parseBold }} /></ul>;
+        return <ul key={idx}><li dangerouslySetInnerHTML={{ __html: parseInline(trimmed.substring(2)) }} /></ul>;
       } else if (trimmed.startsWith('> ')) {
-        return <blockquote key={idx}>{trimmed.substring(2)}</blockquote>;
+        return <blockquote key={idx} dangerouslySetInnerHTML={{ __html: parseInline(trimmed.substring(2)) }} />;
       } else if (trimmed.length === 0) {
         return <br key={idx} />;
       } else {
-        const parseBold = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        return <p key={idx} dangerouslySetInnerHTML={{ __html: parseBold }} />;
+        return <p key={idx} dangerouslySetInnerHTML={{ __html: parseInline(trimmed) }} />;
       }
     });
   };
@@ -39,13 +82,21 @@ export default function DocsMainPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const activeDoc = activeSlug ? getDocBySlug(activeSlug) : null;
+  const handleTocClick = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      // Ajusta o offset considerando o header fixo
+      const y = element.getBoundingClientRect().top + window.scrollY - 100;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className={styles.docsLayout}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <div className={styles.logoContainer} onClick={() => setActiveSlug(null)} style={{ cursor: 'pointer' }}>
+          <div className={styles.logoContainer} onClick={() => handleNavClick('introducao')} style={{ cursor: 'pointer' }}>
             <img src="/assets/logo.svg" alt="FLOW Logo" className={styles.logoImage} />
           </div>
 
@@ -78,7 +129,7 @@ export default function DocsMainPage() {
                   return (
                     <li key={item.slug}>
                       <button
-                        onClick={() => handleNavClick(item.slug)}
+                         onClick={() => handleNavClick(item.slug)}
                         className={`${styles.sidebarBtn} ${isActive ? styles.sidebarBtnActive : ''}`}
                       >
                         {item.title}
@@ -92,61 +143,41 @@ export default function DocsMainPage() {
         </aside>
 
         <main className={styles.contentWrapper}>
-          {!activeDoc ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className={styles.hero}>
-                <h1 className="text-4xl font-extrabold text-white mb-4">Bem-vindo à Central de Ajuda do FLOW</h1>
-                <p className={styles.heroSubtitle}>
-                  Encontre guias completos, tutoriais e referências técnicas para automatizar seu atendimento e vendas com inteligência.
-                </p>
-              </div>
+          {activeDoc && (
+            <div className={styles.docInnerLayout}>
+              <article className={`${styles.article} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+                {renderMarkdownText(activeDoc.content)}
+              </article>
 
-              <div className={styles.gridCards}>
-                <div onClick={() => handleNavClick('introducao')} className={styles.card}>
-                  <div className="h-12 w-12 rounded-lg bg-[rgba(18,105,244,0.15)] flex items-center justify-center mb-4 text-[var(--color-primary)]">
-                    <BookOpenText size={24} />
+              {toc.length > 0 && (
+                <aside className={styles.tocSidebar}>
+                  <div className={styles.tocFixed}>
+                    <h4 className={styles.tocTitle}>
+                      <List size={14} className="mr-2" />
+                      Links Rápidos
+                    </h4>
+                    <ul className={styles.tocList}>
+                      {toc.map((heading) => (
+                        <li 
+                          key={heading.id} 
+                          style={{
+                             paddingLeft: heading.level === 3 ? '16px' : '0'
+                          }}
+                        >
+                          <a 
+                            href={`#${heading.id}`}
+                            onClick={(e) => handleTocClick(heading.id, e)}
+                            className={styles.tocLink}
+                          >
+                            {heading.text}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <h3>Primeiros Passos</h3>
-                  <p>Aprenda os conceitos fundamentais do FLOW e como iniciar a automação do seu canal.</p>
-                </div>
-
-                <div onClick={() => handleNavClick('gestao-contatos')} className={styles.card}>
-                  <div className="h-12 w-12 rounded-lg bg-[rgba(18,105,244,0.15)] flex items-center justify-center mb-4 text-[var(--color-primary)]">
-                    <Users size={24} />
-                  </div>
-                  <h3>Kanban e CRM</h3>
-                  <p>Organize clientes em etapas de funil para facilitar a comunicação e fechar mais vendas.</p>
-                </div>
-
-                <div onClick={() => handleNavClick('conexoes-whatsapp')} className={styles.card}>
-                  <div className="h-12 w-12 rounded-lg bg-[rgba(18,105,244,0.15)] flex items-center justify-center mb-4 text-[var(--color-primary)]">
-                    <MessageSquareShare size={24} />
-                  </div>
-                  <h3>Conexões WhatsApp</h3>
-                  <p>Conecte seus números oficiais via QR Code e habilite os robôs imediatamente em tempo real.</p>
-                </div>
-              </div>
-
-              <h2 className="text-2xl font-bold text-white mt-12 mb-6">Explore também</h2>
-              <ul className="space-y-4">
-                <li>
-                  <button onClick={() => handleNavClick('campanhas')} className="flex items-center gap-2 text-[var(--color-white)] font-medium hover:underline bg-transparent border-none p-0 cursor-pointer">
-                    Como fazer disparos em massa e campanhas
-                    <ArrowRight size={16} />
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleNavClick('bases-conhecimento')} className="flex items-center gap-2 text-[var(--color-white)] font-medium hover:underline bg-transparent border-none p-0 cursor-pointer">
-                    Entenda como treinar e afinar sua Inteligência Artificial
-                    <ArrowRight size={16} />
-                  </button>
-                </li>
-              </ul>
+                </aside>
+              )}
             </div>
-          ) : (
-            <article className={`${styles.article} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
-              {renderMarkdownText(activeDoc.content)}
-            </article>
           )}
         </main>
       </div>
