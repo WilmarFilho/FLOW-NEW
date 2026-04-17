@@ -142,6 +142,7 @@ export class AgendamentosService {
   async getAvailableSlots(params: {
     businessHours: BusinessHours;
     daysAhead?: number;
+    fromDate?: Date | null;
     profileId: string;
     slotMinutes?: number;
   }) {
@@ -149,7 +150,9 @@ export class AgendamentosService {
     const slotMinutes = params.slotMinutes || 60;
     const timezone = params.businessHours.timezone || 'America/Sao_Paulo';
     const now = new Date();
-    const rangeEnd = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    // Se fromDate fornecido e estiver no futuro, começa a iteração a partir dele
+    const searchStart = params.fromDate && params.fromDate > now ? params.fromDate : now;
+    const rangeEnd = new Date(searchStart.getTime() + daysAhead * 24 * 60 * 60 * 1000);
     const occupiedIntervals = await this.getOccupiedIntervals(
       params.profileId,
       now.toISOString(),
@@ -162,7 +165,7 @@ export class AgendamentosService {
     }> = [];
 
     for (let dayOffset = 0; dayOffset < daysAhead; dayOffset += 1) {
-      const currentDate = new Date(now);
+      const currentDate = new Date(searchStart);
       currentDate.setHours(0, 0, 0, 0);
       currentDate.setDate(currentDate.getDate() + dayOffset);
 
@@ -199,7 +202,7 @@ export class AgendamentosService {
       }
     }
 
-    return availableSlots.slice(0, 12);
+    return availableSlots;
   }
 
   async createAutomaticAgendamento(params: {

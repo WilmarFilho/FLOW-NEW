@@ -66,8 +66,18 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   private readonly openai: OpenAI;
   private readonly embeddingModel = 'text-embedding-3-large';
   private readonly responseModel = 'gpt-4.1-mini';
+
+  // -------------------------------------------------------------------------
+  // Controle de processamento por conversa (granularidade fina)
+  // Substitui o flag global isProcessingBatches que bloqueava TODAS as conversas
+  // quando uma delas travava. Agora cada conversa tem seu próprio lock.
+  // -------------------------------------------------------------------------
+  private readonly processingConversations = new Set<string>();
+  private readonly conversationBatchTimers = new Map<string, NodeJS.Timeout>();
+
+  // Safety-net poller: roda a cada 30s apenas para reprocessar batches que
+  // escaparam do trigger imediato (ex: restart do servidor, erro de rede)
   private batchPoller: NodeJS.Timeout | null = null;
-  private isProcessingBatches = false;
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -85,15 +95,62 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
+    // Ao iniciar, reseta batches 'processing' órfãos (de processo morto/restart)
+    // e dispara trigger imediato para cada conversa afetada.
+    setTimeout(() => {
+      void this.recoverOrphanedBatches();
+    }, 2_000);
+
+    // Safety net: varre batches pendentes que podem ter escapado do trigger
     this.batchPoller = setInterval(() => {
-      void this.processPendingBatches();
-    }, 8_000);
+      void this.runSafetyNetPoll();
+    }, 30_000);
   }
 
   onModuleDestroy() {
     if (this.batchPoller) {
       clearInterval(this.batchPoller);
       this.batchPoller = null;
+    }
+
+    for (const timeout of this.conversationBatchTimers.values()) {
+      clearTimeout(timeout);
+    }
+    this.conversationBatchTimers.clear();
+  }
+
+  // ---------------------------------------------------------------------------
+  // STARTUP RECOVERY: ao iniciar o servidor, qualquer batch com status='processing'
+  // é um batch órfão (o processo morreu durante o processamento).
+  // Resetamos para 'pending' e disparamos triggers imediatos.
+  // ---------------------------------------------------------------------------
+  private async recoverOrphanedBatches() {
+    console.log('[STARTUP] Verificando batches órfãos (status=processing de processo morto)...');
+
+    const { data: orphaned, error } = await this.supabaseService
+      .getClient()
+      .from('conversas_lotes_recebimento')
+      .update({ status: 'pending', updated_at: new Date().toISOString() })
+      .eq('status', 'processing')
+      .select('id, conversa_id, scheduled_for');
+
+    if (error) {
+      console.error('[STARTUP] Erro ao recuperar batches órfãos:', error);
+      return;
+    }
+
+    if (!orphaned?.length) {
+      console.log('[STARTUP] Nenhum batch órfão encontrado. Sistema limpo.');
+      return;
+    }
+
+    console.log(`[STARTUP] ${orphaned.length} batch(es) órfão(s) recuperado(s). Disparando triggers...`);
+
+    // Dispara um trigger por conversa única afetada
+    const conversaIds = Array.from(new Set(orphaned.map((b) => b.conversa_id)));
+    for (const conversaId of conversaIds) {
+      console.log(`[STARTUP] Disparando processamento para conversa=${conversaId} (batch órfão recuperado)`);
+      void this.processConversaBatch(conversaId);
     }
   }
 
@@ -1089,28 +1146,41 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     profileId: string,
     messageId: string,
   ) {
+    const DEBOUNCE_MS = 5_000;
     const client = this.supabaseService.getClient();
-    const { data: existingPending } = await client
+
+    console.log(`[QUEUE] queueInboundBatch iniciado. conversa=${conversaId} msgId=${messageId}`);
+
+    const { data: existingPending, error: pendingError } = await client
       .from('conversas_lotes_recebimento')
       .select('id, message_ids')
       .eq('conversa_id', conversaId)
       .eq('status', 'pending')
       .maybeSingle();
 
+    if (pendingError) {
+      console.error(`[QUEUE] Erro ao buscar lote pendente. conversa=${conversaId}`, pendingError);
+    }
+
     if (existingPending) {
       const nextMessageIds = Array.from(
         new Set([...(existingPending.message_ids || []), messageId]),
       );
-
+      console.log(`[QUEUE] Lote pendente encontrado (id=${existingPending.id}). Adicionando msg e resetando debounce. total_msgs=${nextMessageIds.length}`);
       await client
         .from('conversas_lotes_recebimento')
         .update({
           message_ids: nextMessageIds,
-          scheduled_for: new Date(Date.now() + 5_000).toISOString(),
+          scheduled_for: new Date(Date.now() + DEBOUNCE_MS).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingPending.id);
-
+      this.scheduleConversationBatchTrigger(
+        conversaId,
+        DEBOUNCE_MS + 600,
+        'debounce resetado',
+      );
+      console.log(`[QUEUE] Debounce resetado. Trigger rearmado para conversa=${conversaId}`);
       return;
     }
 
@@ -1122,24 +1192,58 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .maybeSingle();
 
     if (existingProcessing) {
-      await client.from('conversas_lotes_recebimento').insert({
-        conversa_id: conversaId,
-        profile_id: profileId,
-        message_ids: [messageId],
-        scheduled_for: new Date(Date.now() + 5_000).toISOString(),
-        status: 'pending',
-      });
-      return;
+      console.log(`[QUEUE] Conversa ${conversaId} já tem batch em processamento (id=${existingProcessing.id}). Novo lote será criado normalmente; trigger disparará após debounce.`);
     }
 
-    await client.from('conversas_lotes_recebimento').insert({
+    const { error: insertError } = await client.from('conversas_lotes_recebimento').insert({
       conversa_id: conversaId,
       profile_id: profileId,
       message_ids: [messageId],
-      scheduled_for: new Date(Date.now() + 5_000).toISOString(),
+      scheduled_for: new Date(Date.now() + DEBOUNCE_MS).toISOString(),
       status: 'pending',
     });
+
+    if (insertError) {
+      console.error(`[QUEUE] Erro ao inserir lote no banco. conversa=${conversaId} msgId=${messageId}`, insertError);
+      return;
+    }
+
+    console.log(`[QUEUE] Novo lote criado para conversa=${conversaId} msgId=${messageId}`);
+
+    // +600ms de folga: garante que scheduled_for <= Date.now() quando a query rodar,
+    // evitando race condition por imprecisão do JS event loop
+    const TRIGGER_DELAY_MS = DEBOUNCE_MS + 600;
+    this.scheduleConversationBatchTrigger(
+      conversaId,
+      TRIGGER_DELAY_MS,
+      'novo lote criado',
+    );
   }
+
+  private scheduleConversationBatchTrigger(
+    conversaId: string,
+    delayMs: number,
+    reason: string,
+  ) {
+    const normalizedDelayMs = Math.max(0, delayMs);
+    const existingTimer = this.conversationBatchTimers.get(conversaId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    console.log(
+      `[QUEUE] Agendando trigger para conversa=${conversaId} em ${normalizedDelayMs}ms (${reason})`,
+    );
+
+    const timeout = setTimeout(() => {
+      this.conversationBatchTimers.delete(conversaId);
+      console.log(`[QUEUE] setTimeout disparado para conversa=${conversaId}`);
+      void this.processConversaBatch(conversaId);
+    }, normalizedDelayMs);
+
+    this.conversationBatchTimers.set(conversaId, timeout);
+  }
+
 
   private async uploadMedia(
     profileId: string,
@@ -1857,58 +1961,142 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     return directData;
   }
 
-  private async processPendingBatches() {
-    if (this.isProcessingBatches) {
+  // ---------------------------------------------------------------------------
+  // TRIGGER IMEDIATO: chamado pelo setTimeout logo após o debounce de 5s.
+  // Processa o próximo batch pendente de uma conversa específica.
+  // Usa lock por conversa (processingConversations Set) em vez de flag global,
+  // permitindo que mútiplas conversas processem em paralelo.
+  // ---------------------------------------------------------------------------
+  private async processConversaBatch(conversaId: string) {
+    console.log(`[QUEUE] processConversaBatch chamado. conversa=${conversaId} emProcessamento=${[...this.processingConversations].join('|') || 'nenhum'}`);
+
+    if (this.processingConversations.has(conversaId)) {
+      console.warn(`[QUEUE] Conversa ${conversaId} já está em processamento. Trigger duplicado ignorado.`);
       return;
     }
 
-    this.isProcessingBatches = true;
+    this.processingConversations.add(conversaId);
+    console.log(`[QUEUE] Lock adquirido para conversa=${conversaId}. Total em processamento: ${this.processingConversations.size}`);
 
     try {
       const client = this.supabaseService.getClient();
       const now = new Date().toISOString();
-      const { data: dueBatches, error } = await client
+
+      console.log(`[QUEUE] Buscando batch due para conversa=${conversaId} scheduled_for<=${now}`);
+      const { data: batch, error } = await client
         .from('conversas_lotes_recebimento')
         .select('id, conversa_id, profile_id, message_ids, scheduled_for, status')
+        .eq('conversa_id', conversaId)
         .eq('status', 'pending')
         .lte('scheduled_for', now)
         .order('scheduled_for', { ascending: true })
-        .limit(5);
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
-        console.error('[BATCH-POLL] Erro ao buscar lotes pendentes:', error);
+        console.error(`[QUEUE] Erro ao buscar batch da conversa ${conversaId}:`, error);
         return;
       }
 
-      if (!dueBatches?.length) {
+      if (!batch) {
+        console.log(`[QUEUE] Nenhum batch due para conversa=${conversaId} no momento. (Ainda no debounce ou já processado). Safety-net fará pickup se necessário.`);
         return;
       }
 
-      console.log(`[BATCH-POLL] ${dueBatches.length} lote(s) pendente(s) encontrado(s).`);
+      console.log(`[QUEUE] Batch encontrado. id=${batch.id} msgs=${batch.message_ids.length} scheduled_for=${batch.scheduled_for}`);
 
-      for (const batch of dueBatches as ConversationBatch[]) {
-        const claimed = await this.claimBatch(batch.id);
-        if (!claimed) {
-          console.warn(`[BATCH-POLL] Lote ${batch.id} não pôde ser reivindicado (já processando?).`);
-          continue;
-        }
-
-        await this.processSingleBatch(claimed);
+      const claimed = await this.claimBatch(batch.id);
+      if (!claimed) {
+        console.warn(`[QUEUE] Batch ${batch.id} não pôde ser reivindicado (race condition com outro worker). Abortando.`);
+        return;
       }
-    } catch (error) {
-      console.error('[BATCH-POLL] Erro inesperado ao processar lotes:', error);
-      await this.logsService.error({
-        action: 'conversas.processPendingBatches',
-        context: ConversasService.name,
-        error,
-        message: 'Erro ao processar lotes de conversas',
-      });
+
+      console.log(`[QUEUE] Batch ${batch.id} reivindicado com sucesso. Iniciando processSingleBatch...`);
+      await this.processSingleBatch(claimed);
+      console.log(`[QUEUE] processSingleBatch concluído para batch=${batch.id}`);
+
+      // Verifica se chegou nova mensagem enquanto processava
+      const { data: nextBatch, error: nextError } = await client
+        .from('conversas_lotes_recebimento')
+        .select('id, scheduled_for')
+        .eq('conversa_id', conversaId)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle();
+
+      if (nextError) {
+        console.error(`[QUEUE] Erro ao verificar próximo batch. conversa=${conversaId}`, nextError);
+      } else if (nextBatch) {
+        const waitMs = Math.max(0, new Date(nextBatch.scheduled_for).getTime() - Date.now());
+        console.log(`[QUEUE] Próximo batch detectado para conversa=${conversaId}. id=${nextBatch.id} aguardando=${waitMs}ms`);
+        this.scheduleConversationBatchTrigger(
+          conversaId,
+          waitMs + 500,
+          `próximo batch ${nextBatch.id}`,
+        );
+      } else {
+        console.log(`[QUEUE] Nenhum batch adicional pendente para conversa=${conversaId}. Pipeline concluída.`);
+      }
+    } catch (batchError) {
+      console.error(`[QUEUE] Erro inesperado ao processar conversa=${conversaId}:`, batchError);
     } finally {
-      this.isProcessingBatches = false;
+      this.processingConversations.delete(conversaId);
+      console.log(`[QUEUE] Lock liberado para conversa=${conversaId}. Total em processamento: ${this.processingConversations.size}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SAFETY NET: roda a cada 30s para pegar batches que escaparam do trigger
+  // imediato (ex: reinício do servidor, falha do setTimeout, crash de processo).
+  // Não usa lock global — spawna um processConversaBatch por conversa encontrada.
+  // ---------------------------------------------------------------------------
+  private async runSafetyNetPoll() {
+    console.log(`[SAFETY-NET] Rodando poll. Conversas em processamento: ${this.processingConversations.size}`);
+    const client = this.supabaseService.getClient();
+    const now = new Date().toISOString();
+    const { data: dueBatches, error } = await client
+      .from('conversas_lotes_recebimento')
+      .select('id, conversa_id, profile_id, message_ids, scheduled_for, status')
+      .eq('status', 'pending')
+      .lte('scheduled_for', now)
+      .order('scheduled_for', { ascending: true })
+      .limit(20);
+
+    if (error) {
+      console.error('[SAFETY-NET] Erro ao buscar batches pendentes:', error);
+      return;
+    }
+
+    if (!dueBatches?.length) {
+      console.log('[SAFETY-NET] Nenhum batch pendente encontrado.');
+      return;
+    }
+
+    console.log(`[SAFETY-NET] ${dueBatches.length} batch(es) pendente(s) encontrado(s) no banco.`);
+
+    const idle = dueBatches.filter(
+      (b) => !this.processingConversations.has(b.conversa_id),
+    );
+
+    const busy = dueBatches.length - idle.length;
+    if (busy > 0) {
+      console.log(`[SAFETY-NET] ${busy} conversa(s) já em processamento, ignorando duplicatas.`);
+    }
+
+    if (!idle.length) {
+      console.log('[SAFETY-NET] Todos os batches já estão sendo processados. Nenhuma ação necessária.');
+      return;
+    }
+
+    console.log(`[SAFETY-NET] Disparando ${idle.length} trigger(s) para conversas sem trigger ativo.`);
+    for (const batch of idle) {
+      console.log(`[SAFETY-NET] Disparando trigger para conversa=${batch.conversa_id} batch=${batch.id} scheduled_for=${batch.scheduled_for}`);
+      void this.processConversaBatch(batch.conversa_id);
     }
   }
 
   private async claimBatch(batchId: string) {
+    console.log(`[QUEUE] Tentando reivindicar batch=${batchId}...`);
     const { data, error } = await this.supabaseService
       .getClient()
       .from('conversas_lotes_recebimento')
@@ -1921,51 +2109,72 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .select('id, conversa_id, profile_id, message_ids, scheduled_for, status')
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.error(`[QUEUE] Erro ao reivindicar batch=${batchId}:`, error);
       return null;
     }
 
+    if (!data) {
+      console.warn(`[QUEUE] Batch ${batchId} não encontrado ou já reivindicado por outro worker.`);
+      return null;
+    }
+
+    console.log(`[QUEUE] Batch ${batchId} reivindicado. status=processing conversa=${data.conversa_id} msgs=${data.message_ids?.length}`);
     return data as ConversationBatch;
   }
 
   private async processSingleBatch(batch: ConversationBatch) {
+    const startedAt = Date.now();
     try {
-      console.log(`[BATCH] Iniciando processamento. batch=${batch.id} conversa=${batch.conversa_id} mensagens=${batch.message_ids.length}`);
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`[BATCH] >>>  INICIANDO  batch=${batch.id}`);
+      console.log(`[BATCH]      conversa=${batch.conversa_id}  msgs=${batch.message_ids.length}`);
+      console.log(`[BATCH]      ids=${batch.message_ids.join(',')}`);
+      console.log(`${'='.repeat(60)}`);
+
       this.logAutomationDebug(batch.id, 'batch.start', {
         conversaId: batch.conversa_id,
         inboundMessageCount: batch.message_ids.length,
       });
 
+      console.log(`[BATCH] [1/9] Carregando dados da conversa...`);
       const conversation = await this.loadConversationForAutomation(batch.conversa_id);
       if (!conversation) {
-        console.warn(`[BATCH] SKIP - conversa não encontrada. batch=${batch.id} conversa=${batch.conversa_id}`);
+        console.warn(`[BATCH] SKIP [1/9] - conversa não encontrada. batch=${batch.id} conversa=${batch.conversa_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'conversation_not_found' });
         await this.finishBatch(batch.id);
         return;
       }
+      console.log(`[BATCH] [1/9] Conversa carregada. ai_enabled=${conversation.ai_enabled} profile=${conversation.profile_id}`);
 
       if (!conversation.ai_enabled) {
-        console.warn(`[BATCH] SKIP - IA desativada. batch=${batch.id} conversa=${batch.conversa_id}`);
+        console.warn(`[BATCH] SKIP [1/9] - IA desativada. batch=${batch.id} conversa=${batch.conversa_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'ai_disabled' });
         await this.finishBatch(batch.id);
         return;
       }
 
-      const { data: subscription } = await this.supabaseService.getClient()
+      console.log(`[BATCH] [2/9] Verificando limite do plano...`);
+      const { data: subscription, error: subError } = await this.supabaseService.getClient()
         .from('subscriptions')
         .select('limite_mensagens_mensais, mensagens_enviadas')
         .eq('profile_id', conversation.profile_id)
         .single();
 
-      console.log(`[BATCH] Verificação de limite: enviadas=${subscription?.mensagens_enviadas ?? 0} / limite=${subscription?.limite_mensagens_mensais ?? 500}`);
+      if (subError) {
+        console.error(`[BATCH] Erro ao buscar subscription. batch=${batch.id}`, subError);
+      }
+
+      console.log(`[BATCH] [2/9] Limite: enviadas=${subscription?.mensagens_enviadas ?? 0} / limite=${subscription?.limite_mensagens_mensais ?? 500}`);
 
       if (subscription && (subscription.mensagens_enviadas || 0) >= (subscription.limite_mensagens_mensais || 500)) {
-        console.warn(`[BATCH] SKIP - limite de mensagens atingido. batch=${batch.id} perfil=${conversation.profile_id}`);
+        console.warn(`[BATCH] SKIP [2/9] - limite de mensagens atingido. batch=${batch.id} perfil=${conversation.profile_id}`);
         this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'plan_limits_reached' });
         await this.finishBatch(batch.id);
         return;
       }
 
+      console.log(`[BATCH] [3/9] Resolvendo conexão e contato...`);
       const connection = this.unwrapRelation<{
         id: string;
         nome: string;
@@ -1986,8 +2195,10 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         whatsapp: string;
       }>(conversation.contatos);
 
+      console.log(`[BATCH] [3/9] connection=${connection?.instance_name ?? 'NULL'} status=${connection?.status ?? 'NULL'} contact=${contact?.nome ?? 'NULL'} phone=${contact?.whatsapp ?? 'NULL'}`);
+
       if (!connection?.instance_name || !contact) {
-        console.warn(`[BATCH] SKIP - conexão ou contato ausente. batch=${batch.id} temContato=${Boolean(contact)} temInstancia=${Boolean(connection?.instance_name)}`);
+        console.warn(`[BATCH] SKIP [3/9] - conexão ou contato ausente. batch=${batch.id} temContato=${Boolean(contact)} temInstancia=${Boolean(connection?.instance_name)}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           hasContact: Boolean(contact),
           hasInstanceName: Boolean(connection?.instance_name),
@@ -1997,9 +2208,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
+      console.log(`[BATCH] [4/9] Validando conexão WhatsApp via double-check...`);
       const connectionValidation = await this.validateAutomationConnection(connection);
+      console.log(`[BATCH] [4/9] Double-check resultado: connected=${connectionValidation.connected} liveState=${connectionValidation.liveState} dbStatus=${connection.status}`);
       if (!connectionValidation.connected) {
-        console.warn(`[BATCH] SKIP - WhatsApp não conectado. batch=${batch.id} instancia=${connection.instance_name} status=${connection.status} liveState=${connectionValidation.liveState}`);
+        console.warn(`[BATCH] SKIP [4/9] - WhatsApp não conectado. batch=${batch.id} instancia=${connection.instance_name} liveState=${connectionValidation.liveState}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           connectionStatus: connection.status,
           liveState: connectionValidation.liveState,
@@ -2009,9 +2222,10 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
+      console.log(`[BATCH] [5/9] Normalizando número do contato...`);
       const number = this.normalizeWhatsapp(contact.whatsapp);
       if (!number) {
-        console.warn(`[BATCH] SKIP - número do contato inválido. batch=${batch.id} whatsapp=${contact.whatsapp}`);
+        console.warn(`[BATCH] SKIP [5/9] - número inválido. batch=${batch.id} whatsapp_raw=${contact.whatsapp}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           contactWhatsapp: contact.whatsapp,
           reason: 'invalid_contact_number',
@@ -2019,7 +2233,9 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         await this.finishBatch(batch.id);
         return;
       }
+      console.log(`[BATCH] [5/9] Número normalizado: ${number}`);
 
+      console.log(`[BATCH] [6/9] Carregando mensagens do lote ids=[${batch.message_ids.join(',')}]...`);
       const { data: inboundMessages, error: messagesError } = await this.supabaseService
         .getClient()
         .from('conversas_mensagens')
@@ -2030,7 +2246,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         .order('created_at', { ascending: true });
 
       if (messagesError || !inboundMessages?.length) {
-        console.warn(`[BATCH] SKIP - mensagens do lote não encontradas. batch=${batch.id} ids=${batch.message_ids.join(',')} erro=${messagesError?.message}`);
+        console.warn(`[BATCH] SKIP [6/9] - mensagens não encontradas. batch=${batch.id} ids=${batch.message_ids.join(',')} erro=${messagesError?.message ?? 'lista vazia'}`);
         this.logAutomationDebug(batch.id, 'batch.skip', {
           messageIds: batch.message_ids,
           reason: 'no_inbound_messages',
@@ -2038,16 +2254,23 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         await this.finishBatch(batch.id);
         return;
       }
+      console.log(`[BATCH] [6/9] ${inboundMessages.length} mensagem(ns) carregada(s).`);
+      inboundMessages.forEach((m, i) => {
+        console.log(`[BATCH]        msg[${i}] tipo=${m.message_type} sender=${m.sender_type} conteudo=${String(m.content ?? m.ai_context_text ?? '').slice(0, 80)}`);
+      });
 
-      console.log(`[BATCH] Mensagens carregadas. batch=${batch.id} count=${inboundMessages.length}`);
-
+      console.log(`[BATCH] [7/9] Carregando preferências e rodando agente de contexto...`);
       const preferences = await this.getAutomationPreferences(conversation.profile_id);
+      console.log(`[BATCH] [7/9] Preferências: agendamento=${preferences.agendamento_automatico_ia} alerta=${preferences.alerta_atendentes_intervencao_ia}`);
+
       const contextAgentOutput = await this.runConversationContextAgent({
         batchId: batch.id,
         conversationId: batch.conversa_id,
         inboundMessages,
       });
+      console.log(`[BATCH] [7/9] Contexto gerado. query_preview="${String(contextAgentOutput.query ?? '').slice(0, 100)}"`);
 
+      console.log(`[BATCH] [8/9] Verificando intenção de agendamento...`);
       const schedulingResult = await this.handleSchedulingAutomation({
         contactId: contact.id,
         contactName: contact.nome,
@@ -2064,6 +2287,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       });
 
       if (schedulingResult) {
+        console.log(`[BATCH] [8/9] Agendamento tratado. parts=${schedulingResult.parts.length}. Enviando resposta de agendamento...`);
         this.logAutomationDebug(batch.id, 'scheduler.handled', {
           parts: schedulingResult.parts.length,
         });
@@ -2078,18 +2302,24 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
           sendErrorMessage: 'Falha ao enviar a resposta automatica de agendamento.',
         });
         await this.finishBatch(batch.id);
+        console.log(`[BATCH] <<<  CONCLUÍDO (agendamento) batch=${batch.id} em ${Date.now() - startedAt}ms`);
         return;
       }
+      console.log(`[BATCH] [8/9] Sem intenção de agendamento. Prosseguindo para agentes de IA...`);
 
+      console.log(`[BATCH] [9/9] Rodando agentes: knowledge, profile, draft, review...`);
       const knowledgeAgentOutput = await this.runKnowledgeAgent({
         batchId: batch.id,
         conhecimentoId: connection.conhecimento_id,
         conversationContext: contextAgentOutput.query,
       });
+      console.log(`[BATCH] [9/9] Knowledge: chunks=${knowledgeAgentOutput.knowledgeContext?.length ?? 0} chars`);
+
       const agentProfile = await this.runAgentProfileStage({
         agenteId: connection.agente_id,
         batchId: batch.id,
       });
+      console.log(`[BATCH] [9/9] AgentProfile: hasPrompt=${Boolean(agentProfile)}`);
 
       const draftReply = await this.generateConversationReply({
         agentProfile,
@@ -2101,6 +2331,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         preferences,
         recentHistory: contextAgentOutput.recentHistory,
       });
+      console.log(`[BATCH] [9/9] Draft gerado: parts=${draftReply?.parts?.length ?? 0}`);
 
       const reviewedReply = await this.runReplyReviewAgent({
         agentProfile,
@@ -2109,7 +2340,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         draftReply,
         knowledgeContext: knowledgeAgentOutput.knowledgeContext,
       });
+      console.log(`[BATCH] [9/9] Review concluído: parts=${reviewedReply.parts.length} shouldHandoff=${reviewedReply.shouldHandoff}`);
+      reviewedReply.parts.forEach((p, i) => {
+        console.log(`[BATCH]        reply[${i}]: "${String(p).slice(0, 120)}"`);
+      });
 
+      console.log(`[BATCH] Enviando ${reviewedReply.parts.length} parte(s) para ${number} via ${connection.instance_name}...`);
       await this.sendReplyParts({
         batchId: batch.id,
         connectionId: connection.id,
@@ -2122,6 +2358,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       });
 
       if (reviewedReply.shouldHandoff) {
+        console.log(`[BATCH] Handoff solicitado. razão="${reviewedReply.handoffReason}"`);
         this.logAutomationDebug(batch.id, 'handoff.requested', {
           reason: reviewedReply.handoffReason,
         });
@@ -2145,9 +2382,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         shouldHandoff: reviewedReply.shouldHandoff,
       });
       await this.finishBatch(batch.id);
+      console.log(`[BATCH] <<<  CONCLUÍDO batch=${batch.id} em ${Date.now() - startedAt}ms`);
+      console.log(`${'='.repeat(60)}\n`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[BATCH] ERRO inesperado. batch=${batch.id} conversa=${batch.conversa_id}`, error);
+      console.error(`[BATCH] !!! ERRO inesperado. batch=${batch.id} conversa=${batch.conversa_id} elapsed=${Date.now() - startedAt}ms`, error);
       this.logAutomationDebug(batch.id, 'batch.error', { error: message });
       this.logsService.createLog({
         level: 'error',
@@ -2158,6 +2397,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.finishBatch(batch.id, message);
+      console.log(`${'='.repeat(60)}\n`);
     }
   }
 
@@ -2379,13 +2619,22 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const { data } = await this.supabaseService
       .getClient()
       .from('atendentes')
-      .select('numero')
+      .select('numero, profile:profile_id(email, nome_completo)')
       .eq('admin_id', adminId)
       .contains('whatsapp_ids', [whatsappConnectionId]);
 
     return (data ?? [])
-      .map((row) => this.normalizeWhatsapp(row.numero))
-      .filter((value): value is string => Boolean(value));
+      .map((row: any) => {
+        const number = this.normalizeWhatsapp(row.numero);
+        if (!number) return null;
+        const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+        return {
+          number,
+          email: (profile?.email as string | null) ?? null,
+          nome: (profile?.nome_completo as string | null) ?? null,
+        };
+      })
+      .filter((item): item is { number: string; email: string | null; nome: string | null } => item !== null);
   }
 
   private async getAutomationPreferences(profileId: string) {
@@ -2559,7 +2808,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (schedulingDecision.intent === 'ask_availability') {
-      // Calcula a janela de busca com base na preferência do cliente (ex: "próxima sexta", "dia 20")
       const preferredStart = schedulingDecision.preferredDateStart
         ? new Date(schedulingDecision.preferredDateStart)
         : null;
@@ -2567,32 +2815,43 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         ? new Date(schedulingDecision.preferredDateEnd)
         : null;
 
-      // Se o cliente pediu uma data específica, buscamos slots a partir dessa data com uma janela de 14 dias
-      // para garantir que encontremos horários disponíveis caso o período solicitado não tenha nenhum
+      // Se o cliente pediu uma data futura, passa fromDate para que getAvailableSlots
+      // comece a iterar a partir dessa data, evitando preencher o buffer com slots anteriores.
       const searchFromDate = preferredStart && preferredStart > new Date() ? preferredStart : null;
       const daysFromNowToPreferred = searchFromDate
         ? Math.ceil((searchFromDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : 0;
-      const daysAhead = Math.max(7, daysFromNowToPreferred + 14);
+      // Busca slots a partir da data preferida com janela generosa
+      const daysAhead = Math.max(7, daysFromNowToPreferred + 7);
 
-      const allSlots = await this.agendamentosService.getAvailableSlots({
+      const slotsFromPreferred = await this.agendamentosService.getAvailableSlots({
         businessHours: params.whatsappBusinessHours,
         daysAhead,
+        fromDate: searchFromDate,
         profileId: params.profileId,
         slotMinutes: params.slotMinutes,
       });
 
-      // Filtra apenas os slots dentro da janela preferida pelo cliente, se houver
-      let slots = allSlots;
-      if (preferredStart || preferredEnd) {
-        const windowStart = preferredStart ?? new Date(0);
-        const windowEnd = preferredEnd ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-        const slotsInWindow = allSlots.filter((slot) => {
-          const slotDate = new Date(slot.startAt);
-          return slotDate >= windowStart && slotDate <= windowEnd;
+      // Se o cliente pediu um período com data de fim, filtra só até lá
+      let slots = slotsFromPreferred;
+      if (preferredEnd) {
+        const slotsInWindow = slotsFromPreferred.filter(
+          (slot) => new Date(slot.startAt) <= preferredEnd,
+        );
+        // Se há slots no período exato usa eles; senão usa todos encontrados a partir da data
+        slots = slotsInWindow.length > 0 ? slotsInWindow : slotsFromPreferred;
+      }
+
+      // Fallback: se ainda vazio, busca a partir de hoje
+      if (!slots.length) {
+        const fallbackSlots = await this.agendamentosService.getAvailableSlots({
+          businessHours: params.whatsappBusinessHours,
+          daysAhead: 7,
+          fromDate: null,
+          profileId: params.profileId,
+          slotMinutes: params.slotMinutes,
         });
-        // Se encontrou slots no período pedido usa eles; senão usa todos os disponíveis com aviso
-        slots = slotsInWindow.length > 0 ? slotsInWindow : allSlots;
+        slots = fallbackSlots;
       }
 
       if (!slots.length) {
@@ -2626,12 +2885,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
           hadPreference
             ? 'Aqui estao os horarios disponiveis no periodo que voce pediu:'
             : 'Posso te oferecer estes horarios disponiveis:',
-          selectedSlots
-            .map(
-              (slot, index) =>
-                `${index + 1}. ${slot.label}`,
-            )
-            .join('\n'),
+          selectedSlots.map((slot, index) => `${index + 1}. ${slot.label}`).join('\n'),
           'Se algum funcionar para voce, me diga qual prefere e eu confirmo por aqui.',
         ],
       };
@@ -2669,7 +2923,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       messages: [
         {
           role: 'system',
-          content: `Analise a mensagem do cliente para detectar intencao de agendamento.
+          content: `Analise a mensagem do cliente para detectar intencao de agendamento automatico.
 Data de hoje (referencia): ${todayIso}
 Retorne JSON:
 {
@@ -2679,11 +2933,15 @@ Retorne JSON:
   "preferredDateStart": "iso-ou-null",
   "preferredDateEnd": "iso-ou-null"
 }
-Use "ask_availability" quando o cliente quiser marcar, agendar, reservar horario, consulta ou visita.
-Use "confirm" apenas quando ele claramente escolher uma das opcoes pendentes.
-Se houver opcoes pendentes, escolha selectedStartAt apenas entre elas.
-Se o cliente mencionar uma data ou periodo especifico (ex: "proximo mes", "dia 20", "semana que vem", "na sexta", "depois do dia 25", "no mes que vem"), preencha preferredDateStart e preferredDateEnd com o inicio e fim desse periodo em ISO 8601 UTC. Por exemplo, se disser "na proxima sexta", calcule a data correta relativa a hoje.
-Se nao houver preferencia de data clara, deixe preferredDateStart e preferredDateEnd como null.`,
+
+REGRAS CRITICAS — leia com atencao:
+1. Use "ask_availability" APENAS quando o cliente quiser marcar, agendar, reservar horario, consulta ou visita de forma generica (sem citar nome de pessoa especifica).
+2. Use "none" quando o cliente pedir para FALAR COM, FALAR AO, TER REUNIAO COM ou CONTATAR uma pessoa especifica pelo nome (ex: "quero falar com o Joao", "preciso de uma reuniao com a Maria", "pode chamar o Pedro?"). Isso e pedido de intervencao humana, NAO agendamento.
+3. Use "none" tambem para saudacoes, duvidas gerais, reclamacoes ou qualquer outra mensagem que nao seja claramente agendamento.
+4. Use "confirm" apenas quando ele claramente escolher uma das opcoes pendentes listadas abaixo.
+5. Se houver opcoes pendentes, escolha selectedStartAt apenas entre elas.
+6. Se o cliente mencionar uma data ou periodo especifico (ex: "proximo mes", "dia 20", "semana que vem", "na sexta"), preencha preferredDateStart e preferredDateEnd com o inicio e fim desse periodo em ISO 8601 UTC.
+7. Se nao houver preferencia de data clara, deixe preferredDateStart e preferredDateEnd como null.`,
         },
         {
           role: 'user',
@@ -3048,6 +3306,7 @@ ${JSON.stringify(params.draftReply)}`,
     whatsappConnectionId: string;
   }) {
     if (params.requestedAt) {
+      console.log(`[HANDOFF] Suprimido: intervenção já havia sido solicitada anteriormente em ${params.requestedAt}.`);
       return;
     }
 
@@ -3073,35 +3332,60 @@ ${JSON.stringify(params.draftReply)}`,
       updated_at: now,
     });
 
-    if (!params.preferenceEnabled || params.alertAlreadySentAt) {
+    if (!params.preferenceEnabled) {
+      console.log(`[HANDOFF] Alerta suprimido: preferência alerta_atendentes_intervencao_ia está desativada.`);
       return;
     }
 
-    const attendantNumbers = await this.getAttendantAlertNumbers(
+    if (params.alertAlreadySentAt) {
+      console.log(`[HANDOFF] Alerta suprimido: alerta já foi enviado aos atendentes em ${params.alertAlreadySentAt}.`);
+      return;
+    }
+
+    const attendants = await this.getAttendantAlertNumbers(
       params.profileId,
       params.whatsappConnectionId,
     );
 
-    if (!attendantNumbers.length) {
+    if (!attendants.length) {
+      console.log(`[HANDOFF] Alerta suprimido: nenhum atendente encontrado/vinculado para a conexão ${params.whatsappConnectionId}.`);
       return;
     }
 
-    const alertMessage = [
-      'Atencao: a IA identificou necessidade de intervencao humana.',
-      `Conversa: ${params.contactName} (${this.normalizeWhatsapp(params.contactPhone) || params.contactPhone})`,
-      `Conexao: ${params.connectionName}`,
-      params.reason ? `Motivo: ${params.reason}` : null,
-      'Abra a plataforma para assumir o atendimento quando necessario.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    console.log(`[HANDOFF] Disparando alertas para ${attendants.length} atendente(s)...`);
 
-    const uniqueNumbers = Array.from(new Set(attendantNumbers));
+    const platformUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.nkwflow.com/login';
+
+    const contactNumber = this.normalizeWhatsapp(params.contactPhone) || params.contactPhone;
+
+    const uniqueNumbers = Array.from(
+      new Map(attendants.map((a) => [a.number, a])).values(),
+    );
+
     await Promise.all(
-      uniqueNumbers.map(async (number) => {
+      uniqueNumbers.map(async (attendant) => {
+        const loginLine = attendant.email
+          ? `Para acessar, faca login com seu e-mail:\n${attendant.email}`
+          : 'Faca login na plataforma com seu e-mail e senha.';
+
+        const alertMessage = [
+          '🔔 *Atendimento requer sua intervenção: ',
+          '',
+          `👤 *Contato:* ${params.contactName} | ${contactNumber}`,
+          `📱 *WhatsApp:* ${params.connectionName}`,
+          params.reason ? `💬 *Motivo:* ${params.reason}` : null,
+          '',
+          '📲 *Acesse a plataforma para iniciar o atendimento:*',
+          platformUrl,
+          '',
+          loginLine,
+        ]
+          .filter((line) => line !== null)
+          .join('\n');
+
         await this.evolutionApiService.sendTextMessage(
           params.connectionInstanceName,
-          number,
+          attendant.number,
           alertMessage,
         );
       }),
