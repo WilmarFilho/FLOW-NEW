@@ -44,6 +44,9 @@ jobs:
 
             # Mantemos .env e .env.prod sincronizados porque o compose usa .env
             # para build local e o stack usa .env.prod em runtime.
+            printf '%s' "$ENV_PROD" > .env.prod
+            cp .env.prod .env
+
             # Exporta variáveis do ambiente de produção para o build local.
             # Lemos linha a linha para evitar que o "source" dê syntax error
             # caso existam URLs ou valores com espaço sem aspas.
