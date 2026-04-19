@@ -6,9 +6,10 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { LogsService } from '../../logs/logs.service';
+import { EvolutionApiService } from '../../whatsapp/evolution-api.service';
+import { ConfigService } from '@nestjs/config';
 
 type WebhookRequest = Request & {
   body?: {
@@ -37,6 +38,7 @@ export class WhatsappWebhookGuard implements CanActivate {
   constructor(
     private readonly configService: ConfigService,
     private readonly logsService: LogsService,
+    private readonly evolutionApiService: EvolutionApiService,
   ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -213,9 +215,9 @@ export class WhatsappWebhookGuard implements CanActivate {
     instanceName: string,
     configuredApiKey: string,
   ) {
-    const baseUrl = this.configService
-      .get<string>('EVOLUTION_API_URL')
-      ?.replace(/\/+$/, '');
+    const baseUrl = await this.evolutionApiService.getBaseUrlForInstance(
+      instanceName,
+    );
 
     if (!baseUrl) {
       return null;
@@ -261,33 +263,5 @@ export class WhatsappWebhookGuard implements CanActivate {
       });
       return null;
     }
-  }
-
-  private previewSecret(value: string | null | undefined) {
-    if (!value) {
-      return '[null]';
-    }
-
-    if (value.length <= 8) {
-      return value;
-    }
-
-    return `${value.slice(0, 4)}...${value.slice(-4)}`;
-  }
-
-  private describeSecretSources(request: WebhookRequest) {
-    return JSON.stringify({
-      authorization: Boolean(request.headers.authorization),
-      apiKeyHeader: Boolean(request.headers.apikey),
-      tokenHeader: Boolean(request.headers.token),
-      secretHeader: Boolean(request.headers['x-webhook-secret']),
-      evolutionHeader: Boolean(request.headers['x-evolution-secret']),
-      queryApiKey: Boolean(request.query.apikey),
-      queryToken: Boolean(request.query.token),
-      querySecret: Boolean(request.query.secret),
-      bodyApiKey: Boolean(request.body?.apikey),
-      bodyToken: Boolean(request.body?.token),
-      bodySecret: Boolean(request.body?.secret),
-    });
   }
 }

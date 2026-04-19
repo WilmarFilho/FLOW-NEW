@@ -26,11 +26,15 @@ jobs:
         env:
           # Passar como env var — NÃO inline no script (evita DRONE_SSH corrompendo .env multilinha)
           ENV_PROD: ${{ secrets.ENV_PROD }}
+          GIT_SHA: ${{ github.sha }}
+          REGISTRY_SERVER: ${{ secrets.REGISTRY_SERVER }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         with:
           host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: ENV_PROD
+          envs: ENV_PROD,GIT_SHA,REGISTRY_SERVER,REGISTRY_USERNAME,REGISTRY_PASSWORD
           script_stop: true
           script: |
             set -e
@@ -38,21 +42,54 @@ jobs:
 
             git pull origin main
 
-            # printf preserva o conteúdo multilinha sem corrupção
-            printf '%s' "$ENV_PROD" > .env
+            # Mantemos .env e .env.prod sincronizados porque o compose usa .env
+            # para build local e o stack usa .env.prod em runtime.
+            printf '%s' "$ENV_PROD" > .env.prod
+            cp .env.prod .env
 
-            docker compose down
-            docker compose up -d --build 2>&1 | tee /tmp/deploy.log
+            # Exporta variáveis do ambiente de produção para o build local.
+            set -a
+            . ./.env.prod
+            set +a
 
-            # Verifica se algum container caiu após subir
-            sleep 5
-            FAILED=$(docker compose ps --filter "status=exited" --format "{{.Name}}" 2>/dev/null || true)
-            if [ -n "$FAILED" ]; then
-              echo "❌ Containers com falha: $FAILED"
-              docker compose logs --tail=50
-              exit 1
+            IMAGE_TAG="${GIT_SHA:-latest}"
+            IMAGE_TAG="${IMAGE_TAG%% *}"
+            IMAGE_TAG="${IMAGE_TAG:-latest}"
+            if [ "$IMAGE_TAG" != "latest" ]; then
+              IMAGE_TAG="$(printf '%.12s' "$IMAGE_TAG")"
             fi
+
+            IMAGE_REGISTRY_PREFIX=""
+            if [ -n "$REGISTRY_SERVER" ] && [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+              REGISTRY_LOGIN_HOST="${REGISTRY_SERVER%%/*}"
+              echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_LOGIN_HOST" -u "$REGISTRY_USERNAME" --password-stdin
+              IMAGE_REGISTRY_PREFIX="${REGISTRY_SERVER}/"
+            fi
+
+            export IMAGE_TAG
+            export IMAGE_REGISTRY_PREFIX
+
+            docker compose --env-file .env.prod -f docker-compose.yml build
+
+            if [ -n "$IMAGE_REGISTRY_PREFIX" ]; then
+              docker push "${IMAGE_REGISTRY_PREFIX}flow_frontend:${IMAGE_TAG}"
+              docker push "${IMAGE_REGISTRY_PREFIX}flow_backend:${IMAGE_TAG}"
+            fi
+
+            # Encerra o eventual compose antigo (só na primeira vez)
+            docker compose down || true
+
+            # Deploy usando Docker Swarm
+            # Se swarm não estiver ativo, force a ativação silenciosamente
+            docker swarm init 2>/dev/null || true
+            docker stack deploy --with-registry-auth -c docker-stack.yml flow_swarm
+
+            # Força a atualização das ROLES caso a imagem tenha alterado
+            docker service update --force flow_swarm_frontend || true
+            docker service update --force flow_swarm_backend || true
+            docker service update --force flow_swarm_evolution || true
+            docker service update --force flow_swarm_evolution-b || true
+            docker service update --force flow_swarm_evolution-c || true
 
             echo "✅ Deploy concluido com sucesso!"
             docker image prune -f
-

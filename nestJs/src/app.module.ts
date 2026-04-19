@@ -23,6 +23,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { BackupModule } from './backup/backup.module';
 
+import { QueueModule } from './queue/queue.module';
+import { CryptoModule } from './crypto/crypto.module';
+
 @Module({
   imports: [
     ScheduleModule.forRoot(),
@@ -43,6 +46,8 @@ import { BackupModule } from './backup/backup.module';
     DashboardModule,
     StripeModule,
     BackupModule,
+    QueueModule,
+    CryptoModule,
   ],
   controllers: [AppController],
   providers: [

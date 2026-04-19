@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import crypto from 'node:crypto';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
+import { CryptoService } from '../crypto/crypto.service';
 import {
   BadRequestException,
   ConflictException,
@@ -67,18 +70,6 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   private readonly embeddingModel = 'text-embedding-3-large';
   private readonly responseModel = 'gpt-4.1-mini';
 
-  // -------------------------------------------------------------------------
-  // Controle de processamento por conversa (granularidade fina)
-  // Substitui o flag global isProcessingBatches que bloqueava TODAS as conversas
-  // quando uma delas travava. Agora cada conversa tem seu próprio lock.
-  // -------------------------------------------------------------------------
-  private readonly processingConversations = new Set<string>();
-  private readonly conversationBatchTimers = new Map<string, NodeJS.Timeout>();
-
-  // Safety-net poller: roda a cada 30s apenas para reprocessar batches que
-  // escaparam do trigger imediato (ex: restart do servidor, erro de rede)
-  private batchPoller: NodeJS.Timeout | null = null;
-
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
@@ -86,6 +77,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     @Inject(forwardRef(() => EvolutionApiService))
     private readonly evolutionApiService: EvolutionApiService,
     private readonly logsService: LogsService,
+    @InjectQueue('conversation-batch') private batchQueue: Queue,
+    private readonly cryptoService: CryptoService,
   ) {
     this.openai = new OpenAI({
       apiKey:
@@ -100,24 +93,9 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     setTimeout(() => {
       void this.recoverOrphanedBatches();
     }, 2_000);
-
-    // Safety net: varre batches pendentes que podem ter escapado do trigger
-    this.batchPoller = setInterval(() => {
-      void this.runSafetyNetPoll();
-    }, 30_000);
   }
 
-  onModuleDestroy() {
-    if (this.batchPoller) {
-      clearInterval(this.batchPoller);
-      this.batchPoller = null;
-    }
-
-    for (const timeout of this.conversationBatchTimers.values()) {
-      clearTimeout(timeout);
-    }
-    this.conversationBatchTimers.clear();
-  }
+  onModuleDestroy() {}
 
   // ---------------------------------------------------------------------------
   // STARTUP RECOVERY: ao iniciar o servidor, qualquer batch com status='processing'
@@ -150,7 +128,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     const conversaIds = Array.from(new Set(orphaned.map((b) => b.conversa_id)));
     for (const conversaId of conversaIds) {
       console.log(`[STARTUP] Disparando processamento para conversa=${conversaId} (batch órfão recuperado)`);
-      void this.processConversaBatch(conversaId);
+      await this.scheduleConversationBatchTrigger(
+        conversaId,
+        0,
+        'startup recovery',
+      );
     }
   }
 
@@ -235,11 +217,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (search) {
-      const filters = [`last_message_preview.ilike.%${search}%`];
       if (matchingContactIds?.length) {
-        filters.push(`contato_id.in.(${matchingContactIds.join(',')})`);
+        query.in('contato_id', matchingContactIds);
+      } else {
+        // Force no results if contact not found since we cannot search encrypted preview
+        query.eq('id', '00000000-0000-0000-0000-000000000000'); 
       }
-      query.or(filters.join(','));
     }
 
     const { data, error } = await query;
@@ -248,12 +231,16 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
 
-    const items = await this.refreshConversationContactAvatars(data ?? []);
+    const refreshedItems = await this.refreshConversationContactAvatars(data ?? []);
+    const decryptedItems = refreshedItems.map((c: any) => ({
+      ...c,
+      last_message_preview: this.cryptoService.decrypt(c.last_message_preview)
+    }));
 
     return {
-      hasMore: items.length > limit,
-      items: items.slice(0, limit),
-      nextOffset: items.length > limit ? offset + limit : null,
+      hasMore: decryptedItems.length > limit,
+      items: decryptedItems.slice(0, limit),
+      nextOffset: decryptedItems.length > limit ? offset + limit : null,
     };
   }
 
@@ -301,7 +288,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
   async getConversa(userId: string, conversaId: string) {
     const conversation = await this.getAccessibleConversa(userId, conversaId);
-    return this.refreshConversationContactAvatar(conversation);
+    const refreshed = await this.refreshConversationContactAvatar(conversation);
+    return {
+      ...refreshed,
+      last_message_preview: this.cryptoService.decrypt(refreshed.last_message_preview)
+    };
   }
 
   async listMensagens(
@@ -325,7 +316,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
 
-    const items = (data ?? []).slice(0, limit).reverse();
+    const items = (data ?? []).slice(0, limit).reverse().map(msg => ({
+      ...msg,
+      content: this.cryptoService.decrypt(msg.content),
+      ai_context_text: this.cryptoService.decrypt(msg.ai_context_text)
+    }));
 
     return {
       hasMore: (data ?? []).length > limit,
@@ -749,7 +744,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('A conexão do WhatsApp não está ativa.');
     }
 
-    const deletePayload = this.buildDeleteMessagePayload(message.raw_payload);
+    const decryptedRawPayload = this.decryptRawPayload(message.raw_payload);
+    const deletePayload = this.buildDeleteMessagePayload(decryptedRawPayload);
     if (!deletePayload) {
       throw new BadRequestException('Não foi possível montar os dados da mensagem para exclusão.');
     }
@@ -767,7 +763,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .getClient()
       .from('conversas_mensagens')
       .update({
-        content: '[Mensagem excluída]',
+        content: this.cryptoService.encrypt('[Mensagem excluída]'),
         media_mime_type: null,
         media_path: null,
         media_url: null,
@@ -858,7 +854,9 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .eq('id', replyToMessageId)
       .maybeSingle();
 
-    const quotedId = this.extractOutgoingMessageId(message?.raw_payload);
+    const quotedId = this.extractOutgoingMessageId(
+      this.decryptRawPayload(message?.raw_payload),
+    );
 
     if (!quotedId) {
       return null;
@@ -870,8 +868,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       },
       message: {
         conversation:
-          message?.content ||
-          message?.ai_context_text ||
+          (message?.content ? this.cryptoService.decrypt(message.content) : null) ||
+          (message?.ai_context_text ? this.cryptoService.decrypt(message.ai_context_text) : null) ||
           'Mensagem respondida via FLOW',
       },
     };
@@ -936,11 +934,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         sender_type: 'user',
         sender_user_id: params.senderUserId,
         message_type: params.messageType,
-        content: params.content,
+        content: this.cryptoService.encrypt(params.content),
         media_mime_type: params.mediaMimeType || null,
         media_path: params.mediaPath || null,
         media_url: params.mediaUrl || null,
-        raw_payload: params.rawPayload,
+        raw_payload: this.encryptRawPayload(params.rawPayload),
         status: 'sent',
         created_at: now,
         updated_at: now,
@@ -963,7 +961,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         human_intervention_requested_at: null,
         human_intervention_reason: null,
         last_attendant_alert_at: null,
-        last_message_preview: preview,
+        last_message_preview: this.cryptoService.encrypt(preview),
         last_message_at: now,
         updated_at: now,
       })
@@ -1090,12 +1088,12 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         direction: 'inbound',
         sender_type: 'customer',
         message_type: message.messageType,
-        content: message.content,
-        ai_context_text: message.aiContextText,
+        content: this.cryptoService.encrypt(message.content),
+        ai_context_text: this.cryptoService.encrypt(message.aiContextText),
         media_url: mediaUpload?.publicUrl ?? null,
         media_path: mediaUpload?.path ?? null,
         media_mime_type: message.mediaMimeType,
-        raw_payload: message.rawPayload,
+        raw_payload: this.encryptRawPayload(message.rawPayload),
         status: 'received',
         created_at: now,
         updated_at: now,
@@ -1122,7 +1120,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .getClient()
       .from('conversas')
       .update({
-        last_message_preview: preview,
+        last_message_preview: this.cryptoService.encrypt(preview),
         last_message_at: now,
         unread_count: (conversa.unread_count ?? 0) + 1,
         updated_at: now,
@@ -1213,35 +1211,34 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     // +600ms de folga: garante que scheduled_for <= Date.now() quando a query rodar,
     // evitando race condition por imprecisão do JS event loop
     const TRIGGER_DELAY_MS = DEBOUNCE_MS + 600;
-    this.scheduleConversationBatchTrigger(
+    void this.scheduleConversationBatchTrigger(
       conversaId,
       TRIGGER_DELAY_MS,
       'novo lote criado',
     );
   }
 
-  private scheduleConversationBatchTrigger(
+  private async scheduleConversationBatchTrigger(
     conversaId: string,
     delayMs: number,
     reason: string,
   ) {
     const normalizedDelayMs = Math.max(0, delayMs);
-    const existingTimer = this.conversationBatchTimers.get(conversaId);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
-
     console.log(
-      `[QUEUE] Agendando trigger para conversa=${conversaId} em ${normalizedDelayMs}ms (${reason})`,
+      `[QUEUE] Agendando enqueue para conversa=${conversaId} em ${normalizedDelayMs}ms (${reason})`,
     );
 
-    const timeout = setTimeout(() => {
-      this.conversationBatchTimers.delete(conversaId);
-      console.log(`[QUEUE] setTimeout disparado para conversa=${conversaId}`);
-      void this.processConversaBatch(conversaId);
-    }, normalizedDelayMs);
-
-    this.conversationBatchTimers.set(conversaId, timeout);
+    // Usa delayed message do BullMQ. O jobId igual para a conversa garante deduplicação se tentarmos enfileirar o mesmo lote várias vezes durante o debounce
+    await this.batchQueue.add(
+      'process',
+      { conversaId },
+      {
+        delay: normalizedDelayMs,
+        jobId: `batch_${conversaId}`,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
   }
 
 
@@ -1967,16 +1964,8 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
   // Usa lock por conversa (processingConversations Set) em vez de flag global,
   // permitindo que mútiplas conversas processem em paralelo.
   // ---------------------------------------------------------------------------
-  private async processConversaBatch(conversaId: string) {
-    console.log(`[QUEUE] processConversaBatch chamado. conversa=${conversaId} emProcessamento=${[...this.processingConversations].join('|') || 'nenhum'}`);
-
-    if (this.processingConversations.has(conversaId)) {
-      console.warn(`[QUEUE] Conversa ${conversaId} já está em processamento. Trigger duplicado ignorado.`);
-      return;
-    }
-
-    this.processingConversations.add(conversaId);
-    console.log(`[QUEUE] Lock adquirido para conversa=${conversaId}. Total em processamento: ${this.processingConversations.size}`);
+  public async processConversaBatch(conversaId: string) {
+    console.log(`[QUEUE] processConversaBatch BullMQ Worker chamado. conversa=${conversaId}`);
 
     try {
       const client = this.supabaseService.getClient();
@@ -1999,7 +1988,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (!batch) {
-        console.log(`[QUEUE] Nenhum batch due para conversa=${conversaId} no momento. (Ainda no debounce ou já processado). Safety-net fará pickup se necessário.`);
+        console.log(`[QUEUE] Nenhum batch due para conversa=${conversaId} no momento. (Ainda no debounce ou já processado).`);
         return;
       }
 
@@ -2029,71 +2018,23 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       } else if (nextBatch) {
         const waitMs = Math.max(0, new Date(nextBatch.scheduled_for).getTime() - Date.now());
         console.log(`[QUEUE] Próximo batch detectado para conversa=${conversaId}. id=${nextBatch.id} aguardando=${waitMs}ms`);
-        this.scheduleConversationBatchTrigger(
-          conversaId,
-          waitMs + 500,
-          `próximo batch ${nextBatch.id}`,
+        await this.batchQueue.add(
+          'process',
+          { conversaId },
+          { delay: waitMs + 500, jobId: `batch_${conversaId}`, removeOnComplete: true, removeOnFail: true }
         );
       } else {
         console.log(`[QUEUE] Nenhum batch adicional pendente para conversa=${conversaId}. Pipeline concluída.`);
       }
     } catch (batchError) {
       console.error(`[QUEUE] Erro inesperado ao processar conversa=${conversaId}:`, batchError);
-    } finally {
-      this.processingConversations.delete(conversaId);
-      console.log(`[QUEUE] Lock liberado para conversa=${conversaId}. Total em processamento: ${this.processingConversations.size}`);
+      throw batchError; // Let BullMQ handle failure/retries
     }
   }
 
   // ---------------------------------------------------------------------------
-  // SAFETY NET: roda a cada 30s para pegar batches que escaparam do trigger
-  // imediato (ex: reinício do servidor, falha do setTimeout, crash de processo).
-  // Não usa lock global — spawna um processConversaBatch por conversa encontrada.
+  // (BullMQ Handles Duplicates & Safety Net natively)
   // ---------------------------------------------------------------------------
-  private async runSafetyNetPoll() {
-    console.log(`[SAFETY-NET] Rodando poll. Conversas em processamento: ${this.processingConversations.size}`);
-    const client = this.supabaseService.getClient();
-    const now = new Date().toISOString();
-    const { data: dueBatches, error } = await client
-      .from('conversas_lotes_recebimento')
-      .select('id, conversa_id, profile_id, message_ids, scheduled_for, status')
-      .eq('status', 'pending')
-      .lte('scheduled_for', now)
-      .order('scheduled_for', { ascending: true })
-      .limit(20);
-
-    if (error) {
-      console.error('[SAFETY-NET] Erro ao buscar batches pendentes:', error);
-      return;
-    }
-
-    if (!dueBatches?.length) {
-      console.log('[SAFETY-NET] Nenhum batch pendente encontrado.');
-      return;
-    }
-
-    console.log(`[SAFETY-NET] ${dueBatches.length} batch(es) pendente(s) encontrado(s) no banco.`);
-
-    const idle = dueBatches.filter(
-      (b) => !this.processingConversations.has(b.conversa_id),
-    );
-
-    const busy = dueBatches.length - idle.length;
-    if (busy > 0) {
-      console.log(`[SAFETY-NET] ${busy} conversa(s) já em processamento, ignorando duplicatas.`);
-    }
-
-    if (!idle.length) {
-      console.log('[SAFETY-NET] Todos os batches já estão sendo processados. Nenhuma ação necessária.');
-      return;
-    }
-
-    console.log(`[SAFETY-NET] Disparando ${idle.length} trigger(s) para conversas sem trigger ativo.`);
-    for (const batch of idle) {
-      console.log(`[SAFETY-NET] Disparando trigger para conversa=${batch.conversa_id} batch=${batch.id} scheduled_for=${batch.scheduled_for}`);
-      void this.processConversaBatch(batch.conversa_id);
-    }
-  }
 
   private async claimBatch(batchId: string) {
     console.log(`[QUEUE] Tentando reivindicar batch=${batchId}...`);
@@ -2254,6 +2195,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         await this.finishBatch(batch.id);
         return;
       }
+      inboundMessages.forEach((m: any) => {
+        m.content = m.content ? this.cryptoService.decrypt(m.content) : null;
+        m.ai_context_text = m.ai_context_text ? this.cryptoService.decrypt(m.ai_context_text) : null;
+      });
+
       console.log(`[BATCH] [6/9] ${inboundMessages.length} mensagem(ns) carregada(s).`);
       inboundMessages.forEach((m, i) => {
         console.log(`[BATCH]        msg[${i}] tipo=${m.message_type} sender=${m.sender_type} conteudo=${String(m.content ?? m.ai_context_text ?? '').slice(0, 80)}`);
@@ -2271,16 +2217,20 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       if (!recentError && recentMessages && recentMessages.length > 0) {
         let isSpam = false;
         const menuRegex = /(?:^|\n)\s*\*?\d+\*?[\.\-\)]\s+.{2,}/gm;
-        const lastMsgContent = String(recentMessages[0].content || '').trim();
+        const decryptedRecent = recentMessages.map(rm => ({
+          ...rm,
+          content: rm.content ? this.cryptoService.decrypt(rm.content) : null
+        }));
+        const lastMsgContent = String(decryptedRecent[0].content || '').trim();
         const matches = lastMsgContent.match(menuRegex);
         
         if (matches && matches.length >= 2) {
             isSpam = true;
             console.log(`[BATCH] Spammer detectado (padrão de menu numérico).`);
-        } else if (recentMessages.length >= 3) {
-            const msg1 = String(recentMessages[0].content || '').trim();
-            const msg2 = String(recentMessages[1].content || '').trim();
-            const msg3 = String(recentMessages[2].content || '').trim();
+        } else if (decryptedRecent.length >= 3) {
+            const msg1 = String(decryptedRecent[0].content || '').trim();
+            const msg2 = String(decryptedRecent[1].content || '').trim();
+            const msg3 = String(decryptedRecent[2].content || '').trim();
             if (msg1.length > 10 && msg1 === msg2 && msg2 === msg3) {
                 isSpam = true;
                 console.log(`[BATCH] Spammer detectado (mensagem repetida 3x).`);
@@ -2304,7 +2254,7 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
                 direction: 'outbound',
                 sender_type: 'system',
                 message_type: 'text',
-                content: '[ANTI-SPAM] IA foi auto-desativada. Detectamos um provável loop com outro bot (opções numeradas ou mensagens repetidas).',
+                content: this.cryptoService.encrypt('[ANTI-SPAM] IA foi auto-desativada. Detectamos um provável loop com outro bot (opções numeradas ou mensagens repetidas).'),
                 status: 'sent',
               });
               
@@ -2563,7 +2513,11 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
       .order('created_at', { ascending: true })
       .limit(80);
 
-    return data ?? [];
+    return (data ?? []).map(msg => ({
+      ...msg,
+      content: msg.content ? this.cryptoService.decrypt(msg.content) : null,
+      ai_context_text: msg.ai_context_text ? this.cryptoService.decrypt(msg.ai_context_text) : null,
+    }));
   }
 
   private async runConversationContextAgent(params: {
@@ -3379,9 +3333,9 @@ ${JSON.stringify(params.draftReply)}`,
       direction: 'system',
       sender_type: 'system',
       message_type: 'text',
-      content: params.reason
+      content: this.cryptoService.encrypt(params.reason
         ? `A IA solicitou intervenção humana: ${params.reason}`
-        : 'A IA solicitou intervenção humana nesta conversa.',
+        : 'A IA solicitou intervenção humana nesta conversa.'),
       status: 'sent',
       created_at: now,
       updated_at: now,
@@ -3536,15 +3490,15 @@ ${JSON.stringify(params.draftReply)}`,
       direction: 'outbound',
       sender_type: 'assistant',
       message_type: 'text',
-      content: params.content,
-      raw_payload: params.rawPayload,
+      content: this.cryptoService.encrypt(params.content),
+      raw_payload: this.encryptRawPayload(params.rawPayload),
       status: 'sent',
       created_at: now,
       updated_at: now,
     });
 
     await this.supabaseService.getClient().from('conversas').update({
-      last_message_preview: params.content,
+      last_message_preview: this.cryptoService.encrypt(params.content),
       last_message_at: now,
       updated_at: now,
     }).eq('id', params.conversationId);
@@ -3962,5 +3916,44 @@ ${JSON.stringify(params.draftReply)}`,
     }
 
     return value ?? null;
+  }
+
+  private encryptRawPayload(
+    payload: Record<string, unknown> | null | undefined,
+  ): string | null {
+    if (!payload) {
+      return null;
+    }
+
+    return this.cryptoService.encrypt(JSON.stringify(payload));
+  }
+
+  private decryptRawPayload(payload: unknown): Record<string, any> | null {
+    if (!payload) {
+      return null;
+    }
+
+    if (typeof payload === 'object') {
+      return payload as Record<string, any>;
+    }
+
+    if (typeof payload !== 'string') {
+      return null;
+    }
+
+    try {
+      const decrypted = this.cryptoService.decrypt(payload);
+      if (!decrypted) {
+        return null;
+      }
+
+      return JSON.parse(decrypted) as Record<string, any>;
+    } catch {
+      try {
+        return JSON.parse(payload) as Record<string, any>;
+      } catch {
+        return null;
+      }
+    }
   }
 }

@@ -11,6 +11,7 @@ services:
         - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY}
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+    image: ${IMAGE_REGISTRY_PREFIX:-}flow_frontend:${IMAGE_TAG:-latest}
     container_name: flow-frontend
     restart: unless-stopped
     ports:
@@ -22,6 +23,7 @@ services:
     build:
       context: ./nestJs
       dockerfile: Dockerfile
+    image: ${IMAGE_REGISTRY_PREFIX:-}flow_backend:${IMAGE_TAG:-latest}
     container_name: flow-backend
     restart: unless-stopped
     ports:

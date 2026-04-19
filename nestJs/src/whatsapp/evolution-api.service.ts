@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LogsService } from '../logs/logs.service';
+import { EvolutionRoutingService } from './evolution-routing.service';
 
 @Injectable()
 export class EvolutionApiService {
   private readonly logger = new Logger(EvolutionApiService.name);
-  private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly webhookBaseUrl: string;
   private readonly webhookSecret: string;
@@ -13,8 +13,8 @@ export class EvolutionApiService {
   constructor(
     private configService: ConfigService,
     private readonly logsService: LogsService,
+    private readonly evolutionRoutingService: EvolutionRoutingService,
   ) {
-    this.baseUrl = (this.configService.get<string>('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
     this.apiKey = this.configService.get<string>('EVOLUTION_API_KEY') || '';
     this.webhookBaseUrl = (this.configService.get<string>('WEBHOOK_BASE_URL') || '').replace(/\/+$/, '');
     this.webhookSecret =
@@ -22,7 +22,7 @@ export class EvolutionApiService {
       this.configService.get<string>('EVOLUTION_WEBHOOK_SECRET') ||
       '';
 
-    if (!this.baseUrl || !this.apiKey) {
+    if (!this.apiKey) {
       this.logger.warn('Evolution API URL ou API Key não configuradas no .env');
       void this.logsService.warn({
         action: 'whatsapp.evolution.config',
@@ -40,11 +40,35 @@ export class EvolutionApiService {
     }
   }
 
-  private async request<T>(method: string, path: string, body?: any): Promise<T | null> {
-    try {
-      const url = `${this.baseUrl}${path}`;
+  async getBaseUrlForInstance(instanceName: string) {
+    return this.evolutionRoutingService.getBaseUrlForInstance(instanceName);
+  }
 
-      const options: RequestInit = {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: any,
+    routeOptions?: {
+      baseUrl?: string | null;
+      instanceName?: string;
+    },
+  ): Promise<T | null> {
+    try {
+      const resolvedBaseUrl =
+        routeOptions?.baseUrl ||
+        (routeOptions?.instanceName
+          ? await this.evolutionRoutingService.getBaseUrlForInstance(routeOptions.instanceName)
+          : null);
+
+      if (!resolvedBaseUrl) {
+        throw new Error(
+          `Nenhum node Evolution resolvido${routeOptions?.instanceName ? ` para ${routeOptions.instanceName}` : ''}.`,
+        );
+      }
+
+      const url = `${resolvedBaseUrl}${path}`;
+
+      const requestOptions: RequestInit = {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -54,10 +78,10 @@ export class EvolutionApiService {
       };
 
       if (body) {
-        options.body = JSON.stringify(body);
+        requestOptions.body = JSON.stringify(body);
       }
 
-      const response = await fetch(url, options);
+      const response = await fetch(url, requestOptions);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -66,7 +90,11 @@ export class EvolutionApiService {
           action: `whatsapp.evolution.${method.toLowerCase()}`,
           context: EvolutionApiService.name,
           message: `Evolution API error ${response.status}: ${errorText}`,
-          metadata: { path, status: response.status },
+          metadata: {
+            baseUrl: resolvedBaseUrl,
+            path,
+            status: response.status,
+          },
         });
         return null;
       }
@@ -94,7 +122,11 @@ export class EvolutionApiService {
         context: EvolutionApiService.name,
         error,
         message: 'Evolution API request failed',
-        metadata: { path },
+        metadata: {
+          baseUrl: routeOptions?.baseUrl || null,
+          instanceName: routeOptions?.instanceName || null,
+          path,
+        },
       });
       return null;
     }
@@ -105,6 +137,7 @@ export class EvolutionApiService {
    * Inclui configuração de webhook para receber CONNECTION_UPDATE
    */
   async createInstance(instanceName: string, number?: string): Promise<any> {
+    const assignedNode = await this.evolutionRoutingService.registerInstance(instanceName);
     const body: any = {
       instanceName,
       groupsIgnore: true,
@@ -133,7 +166,16 @@ export class EvolutionApiService {
       body.number = number;
     }
 
-    return this.request('POST', '/instance/create', body);
+    const result = await this.request('POST', '/instance/create', body, {
+      baseUrl: assignedNode?.url || null,
+      instanceName,
+    });
+
+    if (!result) {
+      await this.evolutionRoutingService.unregisterInstance(instanceName);
+    }
+
+    return result;
   }
 
   /**
@@ -141,28 +183,45 @@ export class EvolutionApiService {
    * Resposta da Evolution v2: { code: "base64...", pairingCode: "...", count: 1 }
    */
   async connectInstance(instanceName: string): Promise<any> {
-    return this.request('GET', `/instance/connect/${instanceName}`);
+    return this.request('GET', `/instance/connect/${instanceName}`, undefined, {
+      instanceName,
+    });
   }
 
   /**
    * Deleta uma instância
    */
   async deleteInstance(instanceName: string): Promise<any> {
-    return this.request('DELETE', `/instance/delete/${instanceName}`);
+    const result = await this.request(
+      'DELETE',
+      `/instance/delete/${instanceName}`,
+      undefined,
+      { instanceName },
+    );
+
+    if (result) {
+      await this.evolutionRoutingService.unregisterInstance(instanceName);
+    }
+
+    return result;
   }
 
   /**
    * Busca o status de uma instância
    */
   async getInstanceStatus(instanceName: string): Promise<any> {
-    return this.request('GET', `/instance/connectionState/${instanceName}`);
+    return this.request('GET', `/instance/connectionState/${instanceName}`, undefined, {
+      instanceName,
+    });
   }
 
   /**
    * Desconecta (logout) uma instância
    */
   async logoutInstance(instanceName: string): Promise<any> {
-    return this.request('DELETE', `/instance/logout/${instanceName}`);
+    return this.request('DELETE', `/instance/logout/${instanceName}`, undefined, {
+      instanceName,
+    });
   }
 
   /**
@@ -204,10 +263,15 @@ export class EvolutionApiService {
    * Envia uma mensagem de texto
    */
   async sendTextMessage(instanceName: string, number: string, text: string): Promise<any> {
-    return this.request('POST', `/message/sendText/${instanceName}`, {
-      number,
-      text,
-    });
+    return this.request(
+      'POST',
+      `/message/sendText/${instanceName}`,
+      {
+        number,
+        text,
+      },
+      { instanceName },
+    );
   }
 
   async sendTextMessageWithOptions(
@@ -221,7 +285,9 @@ export class EvolutionApiService {
       };
     },
   ): Promise<any> {
-    return this.request('POST', `/message/sendText/${instanceName}`, payload);
+    return this.request('POST', `/message/sendText/${instanceName}`, payload, {
+      instanceName,
+    });
   }
 
   async sendMediaMessage(
@@ -239,7 +305,9 @@ export class EvolutionApiService {
       };
     },
   ): Promise<any> {
-    return this.request('POST', `/message/sendMedia/${instanceName}`, payload);
+    return this.request('POST', `/message/sendMedia/${instanceName}`, payload, {
+      instanceName,
+    });
   }
 
   async sendWhatsAppAudio(
@@ -253,7 +321,12 @@ export class EvolutionApiService {
       };
     },
   ): Promise<any> {
-    return this.request('POST', `/message/sendWhatsAppAudio/${instanceName}`, payload);
+    return this.request(
+      'POST',
+      `/message/sendWhatsAppAudio/${instanceName}`,
+      payload,
+      { instanceName },
+    );
   }
 
   async deleteMessageForEveryone(
@@ -269,6 +342,7 @@ export class EvolutionApiService {
       'DELETE',
       `/chat/deleteMessageForEveryone/${instanceName}`,
       payload,
+      { instanceName },
     );
   }
 
@@ -278,11 +352,16 @@ export class EvolutionApiService {
     presence: 'composing' | 'paused' | 'recording',
     delay = 1500,
   ): Promise<any> {
-    return this.request('POST', `/chat/sendPresence/${instanceName}`, {
-      number,
-      delay,
-      presence,
-    });
+    return this.request(
+      'POST',
+      `/chat/sendPresence/${instanceName}`,
+      {
+        number,
+        delay,
+        presence,
+      },
+      { instanceName },
+    );
   }
 
   async getBase64FromMediaMessage(
@@ -297,12 +376,18 @@ export class EvolutionApiService {
         message: messagePayload,
         convertToMp4,
       },
+      { instanceName },
     );
   }
 
   async fetchProfilePictureUrl(instanceName: string, number: string): Promise<any> {
-    return this.request('POST', `/chat/fetchProfilePictureUrl/${instanceName}`, {
-      number,
-    });
+    return this.request(
+      'POST',
+      `/chat/fetchProfilePictureUrl/${instanceName}`,
+      {
+        number,
+      },
+      { instanceName },
+    );
   }
 }
