@@ -83,8 +83,10 @@ jobs:
             docker compose down || true
 
             # Deploy usando Docker Swarm
-            # Se swarm não estiver ativo, force a ativação silenciosamente
-            docker swarm init 2>/dev/null || true
+            if ! docker info | grep -q "Swarm: active"; then
+              echo "Inicializando Docker Swarm..."
+              docker swarm init --advertise-addr $(hostname -I | awk '{print $1}') || true
+            fi
             docker stack deploy --with-registry-auth -c docker-stack.yml flow_swarm
 
             # Força a atualização das ROLES caso a imagem tenha alterado
