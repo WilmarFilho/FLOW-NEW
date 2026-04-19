@@ -21,6 +21,8 @@ import { ContatosModule } from './contatos/contatos.module';
 import { StripeModule } from './stripe/stripe.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { BackupModule } from './backup/backup.module';
+
 @Module({
   imports: [
     ScheduleModule.forRoot(),
@@ -40,6 +42,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ConversasModule,
     DashboardModule,
     StripeModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [

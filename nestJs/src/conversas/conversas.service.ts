@@ -2259,6 +2259,61 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         console.log(`[BATCH]        msg[${i}] tipo=${m.message_type} sender=${m.sender_type} conteudo=${String(m.content ?? m.ai_context_text ?? '').slice(0, 80)}`);
       });
 
+      console.log(`[BATCH] [6.5/9] Anti-spam (Bot loop check)...`);
+      const { data: recentMessages, error: recentError } = await this.supabaseService.getClient()
+        .from('conversas_mensagens')
+        .select('content, created_at')
+        .eq('conversa_id', batch.conversa_id)
+        .eq('direction', 'inbound')
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      if (!recentError && recentMessages && recentMessages.length > 0) {
+        let isSpam = false;
+        const menuRegex = /(?:^|\n)\s*\*?\d+\*?[\.\-\)]\s+.{2,}/gm;
+        const lastMsgContent = String(recentMessages[0].content || '').trim();
+        const matches = lastMsgContent.match(menuRegex);
+        
+        if (matches && matches.length >= 2) {
+            isSpam = true;
+            console.log(`[BATCH] Spammer detectado (padrão de menu numérico).`);
+        } else if (recentMessages.length >= 3) {
+            const msg1 = String(recentMessages[0].content || '').trim();
+            const msg2 = String(recentMessages[1].content || '').trim();
+            const msg3 = String(recentMessages[2].content || '').trim();
+            if (msg1.length > 10 && msg1 === msg2 && msg2 === msg3) {
+                isSpam = true;
+                console.log(`[BATCH] Spammer detectado (mensagem repetida 3x).`);
+            }
+        }
+        
+        if (isSpam) {
+            console.warn(`[BATCH] SKIP [6.5/9] - Bot loop / Spam detectado. batch=${batch.id}`);
+            
+            await this.supabaseService.getClient()
+              .from('conversas')
+              .update({ ai_enabled: false, ai_disabled_at: new Date().toISOString() })
+              .eq('id', batch.conversa_id);
+              
+            await this.supabaseService.getClient()
+              .from('conversas_mensagens')
+              .insert({
+                conversa_id: batch.conversa_id,
+                profile_id: conversation.profile_id,
+                whatsapp_connection_id: connection.id,
+                direction: 'outbound',
+                sender_type: 'system',
+                message_type: 'text',
+                content: '[ANTI-SPAM] IA foi auto-desativada. Detectamos um provável loop com outro bot (opções numeradas ou mensagens repetidas).',
+                status: 'sent',
+              });
+              
+            this.logAutomationDebug(batch.id, 'batch.skip', { reason: 'spam_detected' });
+            await this.finishBatch(batch.id);
+            return;
+        }
+      }
+
       console.log(`[BATCH] [7/9] Carregando preferências e rodando agente de contexto...`);
       const preferences = await this.getAutomationPreferences(conversation.profile_id);
       console.log(`[BATCH] [7/9] Preferências: agendamento=${preferences.agendamento_automatico_ia} alerta=${preferences.alerta_atendentes_intervencao_ia}`);
