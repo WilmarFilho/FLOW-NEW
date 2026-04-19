@@ -47,10 +47,15 @@ jobs:
             printf '%s' "$ENV_PROD" > .env.prod
             cp .env.prod .env
 
-            # Exporta variáveis do ambiente de produção para o build local.
-            set -a
-            . ./.env.prod
-            set +a
+            # Exporta variáveis do ambiente de produção para o build local
+            # sem executar o arquivo no shell. Isso evita quebrar em valores
+            # com caracteres como "|" e ",".
+            while IFS= read -r line || [ -n "$line" ]; do
+              case "$line" in
+                ''|\#*) continue ;;
+              esac
+              export "$line"
+            done < ./.env.prod
 
             IMAGE_TAG="${GIT_SHA:-latest}"
             IMAGE_TAG="${IMAGE_TAG%% *}"
