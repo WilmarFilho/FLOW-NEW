@@ -46,13 +46,16 @@ export class WhatsappWebhookGuard implements CanActivate {
     const configuredApiKey = this.configService
       .get<string>('EVOLUTION_API_KEY')
       ?.trim();
+    const configuredWebhookSecret =
+      this.configService.get<string>('WHATSAPP_WEBHOOK_SECRET')?.trim() ||
+      this.configService.get<string>('EVOLUTION_WEBHOOK_SECRET')?.trim();
 
-    if (!configuredApiKey) {
+    if (!configuredApiKey && !configuredWebhookSecret) {
       await this.logsService.warn({
         action: 'whatsapp.webhook.auth',
         context: WhatsappWebhookGuard.name,
         message:
-          'EVOLUTION_API_KEY não configurada. Permitindo requisição sem validação.',
+          'Nenhuma API Key ou Webhook Secret configurados. Permitindo requisição sem validação.',
       });
       return true;
     }
@@ -71,7 +74,11 @@ export class WhatsappWebhookGuard implements CanActivate {
     }
 
 
-    if (headerSecret === configuredApiKey) {
+    if (configuredApiKey && headerSecret === configuredApiKey) {
+      return true;
+    }
+
+    if (configuredWebhookSecret && headerSecret === configuredWebhookSecret) {
       return true;
     }
 
@@ -88,10 +95,9 @@ export class WhatsappWebhookGuard implements CanActivate {
         return true;
       }
 
-      const instanceApiKey = await this.fetchInstanceApiKey(
-        instanceName,
-        configuredApiKey,
-      );
+      const instanceApiKey = configuredApiKey
+        ? await this.fetchInstanceApiKey(instanceName, configuredApiKey)
+        : null;
 
 
       if (instanceApiKey && headerSecret === instanceApiKey) {

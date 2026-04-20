@@ -74,7 +74,7 @@ export class EvolutionApiService {
           'Content-Type': 'application/json',
           apikey: this.apiKey,
         },
-        signal: AbortSignal.timeout(8000), // Evita travamento infinito do fetch
+        signal: AbortSignal.timeout(25000), // Tempo maior (25s) para criação de instâncias com db persistido
       };
 
       if (body) {
