@@ -90,6 +90,15 @@ export class ConversasController {
     return this.conversasService.listMensagens(userId, conversaId, params);
   }
 
+  @Get(':id/messages/:messageId')
+  async getMensagem(
+    @CurrentUserId() userId: string,
+    @Param('id') conversaId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.conversasService.getMensagem(userId, conversaId, messageId);
+  }
+
   @Patch(':id/read')
   async markAsRead(
     @CurrentUserId() userId: string,

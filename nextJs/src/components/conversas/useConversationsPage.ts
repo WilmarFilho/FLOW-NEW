@@ -493,17 +493,10 @@ export function useConversationsPage() {
         return;
       }
 
-      // Atualiza as mensagens abertas se for a conversa selecionada
-      if (record.conversa_id === selectedConversationId) {
-        setMessages((current) =>
-          payload.eventType === 'DELETE'
-            ? removeMessage(current, record.id)
-            : upsertMessage(current, record),
-        );
-      }
-
       if (payload.eventType === 'DELETE') {
-        // Em delete, apenas atualiza o preview se a conversa já está na lista
+        if (record.conversa_id === selectedConversationId) {
+          setMessages((current) => removeMessage(current, record.id));
+        }
         patchConversationInState(record.conversa_id, (current) => ({
           ...current,
           updated_at: record.updated_at || current.updated_at,
@@ -511,74 +504,79 @@ export function useConversationsPage() {
         return;
       }
 
-      // Para INSERT / UPDATE: verifica se a conversa já está carregada
-      setConversations((current) => {
-        const index = current.findIndex((item) => item.id === record.conversa_id);
+      // Para INSERT / UPDATE: buscar a mensagem descriptografada da API primeiro
+      void apiRequest<ConversationMessage>(
+        `/conversas/${record.conversa_id}/messages/${record.id}`,
+        { userId },
+      )
+        .then((decryptedRecord) => {
+          // 1. Atualizar a lista de mensagens abertas
+          if (decryptedRecord.conversa_id === selectedConversationId) {
+            setMessages((current) => upsertMessage(current, decryptedRecord));
+          }
 
-        const preview = buildConversationPreviewFromMessage(record);
-        const newLastMessageAt = record.created_at || new Date().toISOString();
+          // 2. Atualizar a conversa na lista lateral
+          setConversations((current) => {
+            const index = current.findIndex((item) => item.id === decryptedRecord.conversa_id);
 
-        if (index >= 0) {
-          // Conversa já está na lista: aplica patch e re-ordena
-          const next = [...current];
-          next[index] = {
-            ...next[index],
-            last_message_at: newLastMessageAt,
-            last_message_preview: preview,
-            unread_count:
-              record.direction === 'inbound' && record.conversa_id !== selectedConversationId
-                ? (next[index].unread_count ?? 0) + 1
-                : next[index].unread_count,
-            updated_at: record.updated_at || next[index].updated_at,
-          };
-          return next.sort(
-            (a, b) =>
-              new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
-          );
-        }
+            const preview = buildConversationPreviewFromMessage(decryptedRecord);
+            const newLastMessageAt = decryptedRecord.created_at || new Date().toISOString();
 
-        // Conversa NÃO está na lista: busca da API e insere no topo
-        // (disparo assíncrono para não bloquear o setter síncrono)
-        setTimeout(() => {
-          void apiRequest<ConversationSummary>(`/conversas/${record.conversa_id}`, { userId })
-            .then((newConv) => {
-              setConversations((prev) => {
-                if (prev.some((c) => c.id === newConv.id)) {
-                  // Chegou enquanto o fetch estava em voo: apenas atualiza
-                  return prev
-                    .map((c) => (c.id === newConv.id ? newConv : c))
-                    .sort(
-                      (a, b) =>
-                        new Date(b.last_message_at).getTime() -
-                        new Date(a.last_message_at).getTime(),
+            if (index >= 0) {
+              const next = [...current];
+              next[index] = {
+                ...next[index],
+                last_message_at: newLastMessageAt,
+                last_message_preview: preview,
+                unread_count:
+                  decryptedRecord.direction === 'inbound' && decryptedRecord.conversa_id !== selectedConversationId
+                    ? (next[index].unread_count ?? 0) + 1
+                    : next[index].unread_count,
+                updated_at: decryptedRecord.updated_at || next[index].updated_at,
+              };
+              return next.sort(
+                (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
+              );
+            }
+
+            // Se não estava na lista, busca a conversa inteira
+            setTimeout(() => {
+              void apiRequest<ConversationSummary>(`/conversas/${decryptedRecord.conversa_id}`, { userId })
+                .then((newConv) => {
+                  setConversations((prev) => {
+                    if (prev.some((c) => c.id === newConv.id)) {
+                      return prev
+                        .map((c) => (c.id === newConv.id ? newConv : c))
+                        .sort(
+                          (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
+                        );
+                    }
+                    return [newConv, ...prev].sort(
+                      (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
                     );
-                }
-                return [newConv, ...prev].sort(
-                  (a, b) =>
-                    new Date(b.last_message_at).getTime() -
-                    new Date(a.last_message_at).getTime(),
-                );
-              });
-            })
-            .catch(() => undefined);
-        }, 0);
+                  });
+                })
+                .catch(() => undefined);
+            }, 0);
 
-        return current; // retorna sem mudança até o fetch terminar
-      });
+            return current;
+          });
 
-      // Também propaga para a conversa selecionada (detalhe aberto no painel direito)
-      void mutateSelectedConversation((current) => {
-        if (!current || current.id !== record.conversa_id) {
-          return current;
-        }
+          // 3. Atualizar o painel de detalhes (caso a conversa esteja selecionada lá em cima)
+          void mutateSelectedConversation((current) => {
+            if (!current || current.id !== decryptedRecord.conversa_id) {
+              return current;
+            }
 
-        return {
-          ...current,
-          last_message_at: record.created_at || current.last_message_at,
-          last_message_preview: buildConversationPreviewFromMessage(record),
-          updated_at: record.updated_at || current.updated_at,
-        };
-      }, false);
+            return {
+              ...current,
+              last_message_at: decryptedRecord.created_at || current.last_message_at,
+              last_message_preview: buildConversationPreviewFromMessage(decryptedRecord),
+              updated_at: decryptedRecord.updated_at || current.updated_at,
+            };
+          }, false);
+        })
+        .catch(() => undefined);
     };
 
     const channel = supabase

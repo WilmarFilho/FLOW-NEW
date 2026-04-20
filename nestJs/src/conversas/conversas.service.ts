@@ -295,6 +295,28 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async getMensagem(userId: string, conversaId: string, messageId: string) {
+    const conversa = await this.getAccessibleConversa(userId, conversaId);
+
+    const { data: msg, error } = await this.supabaseService
+      .getClient()
+      .from('conversas_mensagens')
+      .select('*')
+      .eq('id', messageId)
+      .eq('conversa_id', conversa.id)
+      .single();
+
+    if (error || !msg) {
+      throw new NotFoundException('Mensagem não encontrada');
+    }
+
+    return {
+      ...msg,
+      content: this.cryptoService.decrypt(msg.content),
+      ai_context_text: this.cryptoService.decrypt(msg.ai_context_text)
+    };
+  }
+
   async listMensagens(
     userId: string,
     conversaId: string,
@@ -2843,12 +2865,27 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
 
       // Se o cliente pediu um período com data de fim, filtra só até lá
       let slots = slotsFromPreferred;
+      let slotsWereInRequestedWindow = false;
       if (preferredEnd) {
         const slotsInWindow = slotsFromPreferred.filter(
           (slot) => new Date(slot.startAt) <= preferredEnd,
         );
-        // Se há slots no período exato usa eles; senão usa todos encontrados a partir da data
-        slots = slotsInWindow.length > 0 ? slotsInWindow : slotsFromPreferred;
+        if (slotsInWindow.length > 0) {
+          slots = slotsInWindow;
+          slotsWereInRequestedWindow = true;
+        } else {
+          slots = slotsFromPreferred;
+        }
+      } else if (preferredStart) {
+        // Sem data de fim: verifica se há slots no mesmo DIA pedido
+        const preferredDay = preferredStart.toISOString().slice(0, 10);
+        const slotsOnSameDay = slotsFromPreferred.filter(
+          (slot) => slot.startAt.slice(0, 10) === preferredDay,
+        );
+        slotsWereInRequestedWindow = slotsOnSameDay.length > 0;
+        if (slotsWereInRequestedWindow) {
+          slots = slotsOnSameDay;
+        }
       }
 
       // Fallback: se ainda vazio, busca a partir de hoje
@@ -2888,12 +2925,30 @@ export class ConversasService implements OnModuleInit, OnModuleDestroy {
         updated_at: new Date().toISOString(),
       }).eq('id', params.conversationId);
 
-      const hadPreference = preferredStart || preferredEnd;
-      return {
-        parts: [
-          hadPreference
+      // Monta a mensagem explicando o que aconteceu com a data pedida
+      const openingParts = [];
+      if (preferredStart && !slotsWereInRequestedWindow) {
+        const requestedDateLabel = new Intl.DateTimeFormat('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          timeZone: params.whatsappBusinessHours.timezone || 'America/Sao_Paulo',
+          weekday: 'long',
+        }).format(preferredStart);
+        openingParts.push(
+          `Nao temos atendimento disponivel na ${requestedDateLabel}.`,
+        );
+        openingParts.push('Mas ja encontrei os horarios mais proximos disponiveis:');
+      } else {
+        openingParts.push(
+          preferredStart
             ? 'Aqui estao os horarios disponiveis no periodo que voce pediu:'
             : 'Posso te oferecer estes horarios disponiveis:',
+        );
+      }
+
+      return {
+        parts: [
+          ...openingParts,
           selectedSlots.map((slot, index) => `${index + 1}. ${slot.label}`).join('\n'),
           'Se algum funcionar para voce, me diga qual prefere e eu confirmo por aqui.',
         ],
