@@ -187,11 +187,11 @@ export default function ObservabilidadePage() {
                     {format(new Date(log.created_at), 'dd/MM HH:mm:ss', { locale: ptBR })}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={\`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium \${
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       log.level === 'error' ? 'bg-red-500/10 text-red-500' :
                       log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-500' :
                       'bg-blue-500/10 text-blue-500'
-                    }\`}>
+                    }`}>
                       {log.level.toUpperCase()}
                     </span>
                   </td>
