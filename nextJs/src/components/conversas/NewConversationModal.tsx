@@ -158,19 +158,7 @@ export default function NewConversationModal({
               </section>
 
               <section className={styles.modalSection}>
-                <div className={styles.sectionHeader}>
-                  <h3>Contato</h3>
-                  <button
-                    type="button"
-                    className={styles.textButton}
-                    onClick={() => {
-                      setManualMode((current) => !current);
-                      setContactId('');
-                    }}
-                  >
-                    {manualMode ? 'Escolher da base' : 'Cadastrar novo número'}
-                  </button>
-                </div>
+
 
                 {manualMode ? (
                   <div className={styles.formGrid}>

@@ -141,6 +141,18 @@ function buildConversationPreviewFromMessage(message: Partial<ConversationMessag
   return 'Nova mensagem';
 }
 
+function isEncryptedRealtimeValue(value: string | null | undefined) {
+  return typeof value === 'string' && value.startsWith('[ENC_v1]:');
+}
+
+function hasRenderableMessageContent(message: Partial<ConversationMessage>) {
+  if (!message.content) {
+    return true;
+  }
+
+  return !isEncryptedRealtimeValue(message.content);
+}
+
 export function useConversationsPage() {
   const [userId, setUserId] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
@@ -448,6 +460,7 @@ export function useConversationsPage() {
       patchConversationInState(recordId, (current) => {
         let profile = current.profile;
 
+        // Resolver o profile apenas quando assigned_user_id muda
         if (record.assigned_user_id !== undefined && record.assigned_user_id !== current.assigned_user_id) {
           if (record.assigned_user_id === null) {
             profile = null;
@@ -473,9 +486,23 @@ export function useConversationsPage() {
           }
         }
 
+        // Nunca atualizar last_message_preview via realtime da tabela conversas:
+        // o preview é sempre mantido do estado atual e só é atualizado pelo
+        // handleMessageChange após a API retornar o conteúdo já descriptografado.
+        // Isso evita que conteúdo criptografado apareça no card da conversa.
         return {
           ...current,
-          ...record,
+          // Apenas campos escalares seguros (sem conteúdo criptografado)
+          ai_enabled: record.ai_enabled ?? current.ai_enabled,
+          ai_disabled_at: record.ai_disabled_at !== undefined ? record.ai_disabled_at : current.ai_disabled_at,
+          assigned_user_id: record.assigned_user_id !== undefined ? record.assigned_user_id : current.assigned_user_id,
+          assigned_at: record.assigned_at !== undefined ? record.assigned_at : current.assigned_at,
+          status: record.status ?? current.status,
+          last_message_at: record.last_message_at ?? current.last_message_at,
+          unread_count: record.unread_count ?? current.unread_count,
+          updated_at: record.updated_at ?? current.updated_at,
+          // last_message_preview intocável via realtime da tabela conversas
+          last_message_preview: current.last_message_preview,
           profile,
         };
       });
@@ -510,6 +537,10 @@ export function useConversationsPage() {
         { userId },
       )
         .then((decryptedRecord) => {
+          if (!hasRenderableMessageContent(decryptedRecord)) {
+            return;
+          }
+
           // 1. Atualizar a lista de mensagens abertas
           if (decryptedRecord.conversa_id === selectedConversationId) {
             setMessages((current) => upsertMessage(current, decryptedRecord));

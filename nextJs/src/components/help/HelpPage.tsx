@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { Send, User, Bot, HelpCircle, Phone, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
@@ -89,16 +90,23 @@ export default function HelpPage() {
           <h1>Central de Ajuda</h1>
           <p>Tire suas dúvidas com nosso suporte inteligente.</p>
         </div>
-        <a
-          href={`https://wa.me/${SUPPORT_WHATSAPP}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.whatsappBtn}
-        >
-          <Phone size={16} />
-          <span>Fale Conosco</span>
-          <ArrowUpRight size={14} style={{ opacity: 0.6 }} />
-        </a>
+        <div className={styles.headerActions}>
+          <Link href="/docs" className={styles.docsBtn}>
+            <HelpCircle size={16} />
+            <span>Documentação</span>
+            <ArrowUpRight size={14} style={{ opacity: 0.6 }} />
+          </Link>
+          <a
+            href={`https://wa.me/${SUPPORT_WHATSAPP}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.whatsappBtn}
+          >
+            <Phone size={16} />
+            <span>Fale Conosco</span>
+            <ArrowUpRight size={14} style={{ opacity: 0.6 }} />
+          </a>
+        </div>
       </header>
 
       <div className={styles.chatContainer}>

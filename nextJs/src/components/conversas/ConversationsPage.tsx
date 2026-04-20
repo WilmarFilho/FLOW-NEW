@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -529,7 +529,19 @@ function isConversationFromDeletedConnection(conversation?: ConversationSummary)
   return Boolean(connection?.deleted_at);
 }
 
+const ENC_PREFIX = '[ENC_v1]:';
+
+function isEncryptedContent(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.startsWith(ENC_PREFIX);
+}
+
 function renderMessageContent(message: ConversationMessage) {
+  // Barreira final: nunca renderizar conteúdo criptografado diretamente.
+  // Se chegar até aqui com conteúdo criptografado, exibe placeholder.
+  if (isEncryptedContent(message.content)) {
+    return <p className={styles.messageText} style={{ opacity: 0.45, fontStyle: 'italic' }}>Processando mensagem...</p>;
+  }
+
   if (message.message_type === 'text') {
     return <p className={styles.messageText}>{message.content}</p>;
   }
@@ -810,6 +822,7 @@ export default function ConversationsPage() {
   const recorderChunksRef = useRef<Blob[]>([]);
   const preserveScrollRef = useRef<{ height: number; top: number } | null>(null);
   const initialScrollPendingRef = useRef(false);
+  const historyPaginationArmedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
 
   const contact = useMemo(
@@ -928,37 +941,65 @@ export default function ConversationsPage() {
     selectedConnectionId,
   ]);
 
+  // Ao trocar de conversa: resetar todo o estado de scroll e paginação
   useEffect(() => {
     if (!selectedConversationId) {
+      initialScrollPendingRef.current = false;
+      historyPaginationArmedRef.current = false;
+      preserveScrollRef.current = null;
+      shouldStickToBottomRef.current = true;
+      setReplyTarget(null);
+      setActiveMessageMenuId(null);
       return;
     }
 
+    // Nova conversa: armar scroll inicial e desarmar paginação histórica
     initialScrollPendingRef.current = true;
+    historyPaginationArmedRef.current = false;
+    preserveScrollRef.current = null;
     shouldStickToBottomRef.current = true;
     setReplyTarget(null);
     setActiveMessageMenuId(null);
   }, [selectedConversationId]);
 
-  useLayoutEffect(() => {
-    if (
-      !selectedConversationId ||
-      !messagesRef.current ||
-      preserveScrollRef.current ||
-      !initialScrollPendingRef.current ||
-      isLoadingConversation ||
-      isLoadingMessages
-    ) {
-      return;
-    }
+  // Ref callback para o container de mensagens.
+  // Dispara EXATAMENTE quando o elemento é montado no DOM pelo AnimatePresence.
+  // Nesse momento, todos os filhos (mensagens) já estão renderizados.
+  // É a solução para o problema de timing com AnimatePresence mode="wait".
+  const messagesContainerRefCallback = useCallback((el: HTMLDivElement | null) => {
+    messagesRef.current = el;
 
-    requestAnimationFrame(() => {
+    if (!el) return;
+
+    // Scroll inicial: se chegou aqui com o flag ativo, o elemento acabou de montar
+    if (initialScrollPendingRef.current) {
+      // Usar rAF para garantir que o browser calculou as alturas dos filhos
       requestAnimationFrame(() => {
-        scrollToLatestMessage();
+        if (!el) return;
         initialScrollPendingRef.current = false;
+        el.scrollTop = el.scrollHeight;
+        requestAnimationFrame(() => {
+          historyPaginationArmedRef.current = true;
+        });
       });
-    });
-  }, [groupedMessages.length, isLoadingConversation, isLoadingMessages, selectedConversationId]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConversationId]);
 
+  // Stick-to-bottom: quando o usuário está no fundo e novas mensagens chegam (realtime),
+  // acompanha automaticamente para baixo.
+  useEffect(() => {
+    if (initialScrollPendingRef.current) return; // aguardar scroll inicial
+    if (!shouldStickToBottomRef.current) return; // usuário scrollou para cima
+    if (preserveScrollRef.current) return; // paginação histórica em andamento
+
+    const container = messagesRef.current;
+    if (!container) return;
+
+    container.scrollTop = container.scrollHeight;
+  }, [groupedMessages.length]);
+
+  // Preservar posição de scroll ao carregar mensagens mais antigas (paginação histórica)
   useEffect(() => {
     if (!messagesRef.current || !preserveScrollRef.current) {
       return;
@@ -968,19 +1009,6 @@ export default function ConversationsPage() {
     const nextHeight = messagesRef.current.scrollHeight;
     messagesRef.current.scrollTop = nextHeight - snapshot.height + snapshot.top;
     preserveScrollRef.current = null;
-  }, [groupedMessages]);
-
-  useEffect(() => {
-    if (
-      !messagesRef.current ||
-      preserveScrollRef.current ||
-      initialScrollPendingRef.current ||
-      !shouldStickToBottomRef.current
-    ) {
-      return;
-    }
-
-    scrollToLatestMessage();
   }, [groupedMessages]);
 
   useEffect(() => {
@@ -1108,6 +1136,10 @@ export default function ConversationsPage() {
 
     shouldStickToBottomRef.current =
       node.scrollHeight - node.scrollTop - node.clientHeight < 120;
+
+    if (initialScrollPendingRef.current || !historyPaginationArmedRef.current) {
+      return;
+    }
 
     if (!hasMoreMessages || isLoadingMoreMessages) {
       return;
@@ -1428,7 +1460,7 @@ export default function ConversationsPage() {
 
 
                 <div
-                  ref={messagesRef}
+                  ref={messagesContainerRefCallback}
                   className={styles.messagesScroller}
                   onScroll={handleMessagesScroll}
                 >
