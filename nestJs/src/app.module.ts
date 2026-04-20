@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { LogsModule } from './logs/logs.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { HttpLoggingInterceptor } from './common/interceptors/http-logging.interceptor';
+import { HealthModule } from './health/health.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ConhecimentosModule } from './conhecimentos/conhecimentos.module';
 import { AtendentesModule } from './atendentes/atendentes.module';
@@ -48,10 +50,12 @@ import { CryptoModule } from './crypto/crypto.module';
     BackupModule,
     QueueModule,
     CryptoModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    HttpLoggingInterceptor,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

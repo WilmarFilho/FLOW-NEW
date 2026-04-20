@@ -10,6 +10,14 @@ services:
         mode: ingress
     env_file:
       - .env.prod
+    environment:
+      - SERVICE_NAME=frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       replicas: 2
       update_config:
@@ -33,6 +41,13 @@ services:
       - .env.prod
     environment:
       - NODE_ENV=production
+      - SERVICE_NAME=backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     depends_on:
       - redis
     deploy:

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '../lib/logger.api';
 
 export default function GlobalError({
@@ -11,7 +12,8 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to our centralized backend logger
+    // Log the error to Sentry and our centralized backend logger
+    Sentry.captureException(error);
     logger.error('Unhandled Global Error', error, { digest: error.digest });
   }, [error]);
 

@@ -27,6 +27,8 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.1",
+    "@sentry/nestjs": "^10.49.0",
+    "@sentry/profiling-node": "^10.49.0",
     "@supabase/supabase-js": "^2.100.1",
     "bullmq": "^5.74.1",
     "class-transformer": "^0.5.1",
