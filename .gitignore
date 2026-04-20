@@ -23,3 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 .env*
+nginx.conf
+nginx.conf.example
