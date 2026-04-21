@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/confirm-email']
+  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/confirm-email', '/api/health']
 
   // Callback route is public to allow token exchange
   const isAuthRoute = publicRoutes.some((route) => request.nextUrl.pathname.startsWith(route)) || request.nextUrl.pathname.startsWith('/auth/callback')
