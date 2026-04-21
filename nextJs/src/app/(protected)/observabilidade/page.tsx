@@ -186,7 +186,7 @@ export default function ObservabilidadePage() {
           </div>
           <span className="text-4xl font-black text-[var(--color-text)]">{stats.errors}</span>
         </div>
-        
+
         <div className="group bg-[var(--color-surface-card)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] rounded-[var(--radius-lg)] p-6 flex flex-col relative overflow-hidden transition-all shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] hover:-translate-y-1">
           <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full blur-2xl transition-all" style={{ backgroundColor: 'var(--color-danger)', opacity: 0.1 }}></div>
           <div className="flex items-center gap-3 mb-4">
@@ -197,7 +197,7 @@ export default function ObservabilidadePage() {
           </div>
           <span className="text-4xl font-black text-[var(--color-text)]">{stats.serverErrors}</span>
         </div>
-        
+
         <div className="group bg-[var(--color-surface-card)] backdrop-blur-[var(--glass-blur)] border border-[var(--glass-border)] rounded-[var(--radius-lg)] p-6 flex flex-col relative overflow-hidden transition-all shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] hover:-translate-y-1">
           <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full blur-2xl transition-all" style={{ backgroundColor: 'var(--color-success)', opacity: 0.1 }}></div>
           <div className="flex items-center gap-3 mb-4">
@@ -227,7 +227,7 @@ export default function ObservabilidadePage() {
             <span className="text-xs font-medium text-[var(--color-text-secondary)]">Live</span>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -239,7 +239,7 @@ export default function ObservabilidadePage() {
                 <th className="px-5 py-4 text-left font-semibold text-[var(--color-text-secondary)] w-1/3">Contexto</th>
               </tr>
             </thead>
-            <tbody style={{ divideColor: 'var(--glass-border)' }}>
+            <tbody className="divide-y divide-[var(--glass-border)]">
               {logs.map((log) => (
                 <tr key={log.id} style={{ borderBottomColor: 'var(--glass-border)' }} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
                   <td className="px-5 py-4 whitespace-nowrap text-[var(--color-text-secondary)] font-mono text-xs">
