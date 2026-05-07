@@ -23,5 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .env*
+!.env.example
+!.env.localdev.example
+!nextJs/.env.local.example
+!nestJs/.env.example
+.local-dev/
 nginx.conf
 nginx.conf.example
+README.md

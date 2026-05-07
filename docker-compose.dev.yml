@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: flow-postgres-dev
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=flowuser
+      - POSTGRES_PASSWORD=flowpass
+      - POSTGRES_DB=flowevolution
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: flow-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+
+  evolution:
+    image: evoapicloud/evolution-api:latest
+    container_name: flow-evolution-dev
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env.localdev
+    environment:
+      - SERVER_PORT=8080
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379/1
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=false
+      - CACHE_LOCAL_ENABLED=false
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://flowuser:flowpass@postgres:5432/flowevolution?schema=public
+      - RABBITMQ_ENABLED=false
+      - WEBSOCKET_ENABLED=false
+    depends_on:
+      - postgres
+      - redis
+    command: ["node", "./dist/src/main.js"]
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:

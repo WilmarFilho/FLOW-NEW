@@ -944,5 +944,13 @@ export function useConversationsPage() {
     setSelectedAssignedUserId,
     setSelectedConnectionId,
     toggleAi,
+    refreshConversation: (conversationId: string) => {
+      if (!userId) return;
+      void apiRequest<ConversationSummary>(`/conversas/${conversationId}`, { userId })
+        .then((newConv) => {
+          patchConversationInState(conversationId, () => newConv);
+        })
+        .catch(() => undefined);
+    },
   };
 }

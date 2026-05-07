@@ -608,13 +608,20 @@ function ConversationListItem({
   conversation,
   isActive,
   onClick,
+  onAvatarError,
 }: {
   conversation: ConversationSummary;
   isActive: boolean;
   onClick: () => void;
+  onAvatarError?: (id: string) => void;
 }) {
   const contact = unwrapRelation(conversation.contatos);
   const connection = unwrapRelation(conversation.whatsapp_connections);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [contact?.avatar_url]);
 
   return (
     <button
@@ -627,8 +634,18 @@ function ConversationListItem({
       }}
     >
       <div className={styles.chatAvatar}>
-        {contact?.avatar_url ? (
-          <Image src={contact.avatar_url} alt={contact.nome} fill sizes="48px" className={styles.chatAvatarImage} />
+        {contact?.avatar_url && !imgError ? (
+          <Image 
+            src={contact.avatar_url} 
+            alt={contact.nome} 
+            fill 
+            sizes="48px" 
+            className={styles.chatAvatarImage} 
+            onError={() => {
+              setImgError(true);
+              if (onAvatarError) onAvatarError(conversation.id);
+            }}
+          />
         ) : (
           <span>{contact?.nome?.charAt(0).toUpperCase() || '#'}</span>
         )}
@@ -798,6 +815,7 @@ export default function ConversationsPage() {
     toggleAi,
     updateConversationAssignment,
     uploadMessageFile,
+    refreshConversation,
   } = useConversationsPage();
   const [draftMessage, setDraftMessage] = useState('');
   const [replyTarget, setReplyTarget] = useState<ConversationMessage | null>(null);
@@ -825,10 +843,16 @@ export default function ConversationsPage() {
   const historyPaginationArmedRef = useRef(false);
   const shouldStickToBottomRef = useRef(true);
 
+  const [headerAvatarError, setHeaderAvatarError] = useState(false);
+
   const contact = useMemo(
     () => unwrapRelation(selectedConversation?.contatos),
     [selectedConversation?.contatos],
   );
+
+  useEffect(() => {
+    setHeaderAvatarError(false);
+  }, [contact?.avatar_url]);
   const connection = useMemo(
     () => unwrapRelation(selectedConversation?.whatsapp_connections),
     [selectedConversation?.whatsapp_connections],
@@ -1315,6 +1339,7 @@ export default function ConversationsPage() {
                         conversation={conversation}
                         isActive={conversation.id === selectedConversationId}
                         onClick={() => selectConversation(conversation.id)}
+                        onAvatarError={refreshConversation}
                       />
                     </motion.div>
                   ))}
@@ -1377,13 +1402,17 @@ export default function ConversationsPage() {
                     </button>
 
                     <div className={styles.chatHeaderAvatar}>
-                      {contact?.avatar_url ? (
+                      {contact?.avatar_url && !headerAvatarError ? (
                         <Image
                           src={contact.avatar_url}
                           alt={contact.nome}
                           fill
                           sizes="52px"
                           className={styles.chatAvatarImage}
+                          onError={() => {
+                            setHeaderAvatarError(true);
+                            if (selectedConversationId) refreshConversation(selectedConversationId);
+                          }}
                         />
                       ) : (
                         <span>{contact?.nome?.charAt(0).toUpperCase() || '#'}</span>
